@@ -1,0 +1,4 @@
+{
+  "//": "Paths rendered per request by the Worker. They must NOT be prerendered: a prerendered file is served as a static asset and the request never reaches the Worker (docs/PLAN.md §2.1). Used by vite.config.ts (prerender filter) and scripts/check-build.mjs (build assertion).",
+  "paths": ["/tsume", "/sitemap.xml", "/api"]
+}

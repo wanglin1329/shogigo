@@ -1,0 +1,45 @@
+// This file is public (GPL repo). It holds configuration only — never secrets.
+// Secrets (TOKEN_SECRET, webhook URLs) go in `wrangler secret put` / .dev.vars.
+// Resource ids (D1 database_id) are identifiers, not secrets.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "shogi",
+	"compatibility_date": "2026-09-25",
+	"compatibility_flags": ["nodejs_compat"],
+	// Worker entry: exports the Durable Objects, routes the online API first,
+	// then hands everything else to TanStack Start (docs/PLAN.md §2.1).
+	"main": "src/server.ts",
+	"assets": {
+		// Prerendered pages are written as `<path>.html` (autoSubfolderIndex: false),
+		// so `/board` is served from board.html and `/board/` 307s to `/board`.
+		"html_handling": "auto-trailing-slash"
+	},
+	// Workers Caching: cached Worker responses are served without running the
+	// Worker. src/server.ts forces `no-store` on anything that does not opt in.
+	"cache": { "enabled": true },
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 0.1
+	},
+	"upload_source_maps": true,
+	"vars": {
+		// Seconds a random-match seeker waits before being offered a COM game.
+		"BOT_FALLBACK_SECONDS": "30"
+	},
+	"durable_objects": {
+		"bindings": [
+			{ "name": "MATCH_ROOM", "class_name": "MatchRoom" },
+			{ "name": "MATCHMAKER", "class_name": "Matchmaker" }
+		]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["MatchRoom", "Matchmaker"] }],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "shogi",
+			// database_id is added after `wrangler d1 create shogi` (first deploy);
+			// local dev and tests work without it.
+			"migrations_dir": "migrations"
+		}
+	]
+}

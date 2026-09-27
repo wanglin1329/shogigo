@@ -1,0 +1,5 @@
+# Workers Static Assets headers (docs/PLAN.md §5.2).
+# The engine directory carries the version in its path, so it can be cached
+# forever; a new engine build goes into a new directory.
+/games/shogi/engine/yaneuraou-v7.63/*
+  Cache-Control: public, max-age=31536000, immutable

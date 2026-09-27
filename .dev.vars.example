@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development. Real values live in
+# `wrangler secret put` (production) and are never committed.
+# Must be >= 16 characters.
+TOKEN_SECRET=local-dev-token-secret-change-me

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2025~ Yuki Lab
+// Copyright 2026 the shogi project contributors
 // Modified 2026-09-27: moved to src/games/shogi/core/engine; code unchanged.
 
 // A small shogi rules engine extracted from the frontend logic (shogi.js),

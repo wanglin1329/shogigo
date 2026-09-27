@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2025~ Yuki Lab
+// Copyright 2026 the shogi project contributors
 // Modified 2026-09-27: import path updated; type-only imports marked for verbatimModuleSyntax.
 
 // These tests pin down the engine behaviour that online play depends on:

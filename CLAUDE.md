@@ -13,4 +13,8 @@
 - テストの Worker 入口は `test/worker-entry.ts`（`src/server.ts` の TanStack 仮想モジュールは vitest から解決できない）
 - `public/games/shogi/engine/` は GPL のまま配布する上流ファイル。改変したら冒頭に `Modified <date>: …` を書く。やねうら王の版を変えたらディレクトリ名（`yaneuraou-v7.63`）と `third_party/yaneuraou/` を同時に更新
 - **公開リポジトリ**: 秘密値は `wrangler secret put` / `.dev.vars` のみ。専用テンプレート（ShipAny 等）のコードを持ち込まない
+- 盤上に重ねる UI（成りの選択・新手デモ）は `Board` の `overlay` に渡す。盤の外に置くと座標がずれる
+- AI の答えは `positionKey()` と世代番号で照合してから適用する。リセット・待った・強さ変更は `ai.cancel()` を同期で呼ぶ（effect の後始末を待つと古い答えが新しい対局に入る）
+- `localStorage` を読むのは水和の後（effect の中）だけ。プリレンダーされた HTML と初回描画を一致させるため。キーは `src/site/storage.ts` 経由（接頭辞 `sg.`）
+- 駒の向きは「持ち主が後手」XOR「盤が反転」（`Piece` の `flipped`）
 - ポート: dev 3160 / preview 3161（3100・3101 はユーザー用）

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2025~ Yuki Lab
+// Copyright 2026 the shogi project contributors
 // Modified 2026-09-27: moved to src/online; the seat type is declared locally instead of importing the shogi engine, so this module stays game-agnostic.
 
 // Signed player tokens (HMAC-SHA256) bind a browser uid to one room seat.

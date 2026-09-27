@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright 2025~ Yuki Lab
+// Copyright 2026 the shogi project contributors
+// Modified 2026-09-27: moved to src/games/shogi/core/waza; imports adapted (no .ts extensions, engine at ../engine).
+
+// 判定のしきい値を1か所に集める。棚卸し（scripts/waza/inventory.ts）で動かす値はここだけ。
+
+export const WAZA_CONFIG = {
+  /** 取り合い計算の打ち切り。1マスに片側8枚以上の利きが集まることは実戦ではまず無い */
+  maxSwapDepth: 16,
+  /** 両取りは、少なくとも片方がこの価値以上でないと名前を出さない（金＝600） */
+  minForkTargetValue: 600,
+  /** 十字飛車は2枚とも銀以上、かつ片方は金以上（終盤の龍でいくらでも作れてしまうため） */
+  minJujiEachValue: 500,
+  minJujiTargetValue: 600,
+  /** 田楽刺しは奥の駒がこの価値以上（串刺しの値打ちは奥にある） */
+  minDengakuBackValue: 600,
+  /** 戦法が成立したとみなす手数の上限 */
+  strategyMaxPly: 60,
+  /**
+   * 棒銀とみなす銀の段。0始まりの盤の行番号で、自分から見て 4=五段目・5=六段目
+   * （後手は 8-y に写してから見る）。つまり 2六銀・2五銀（後手は8四・8五）だけ。
+   * 飛車が初期の筋にいることも要る。中飛車の5六銀・四間飛車の6六銀は
+   * 「飛車と同じ筋の銀」でも棒銀ではないので、そこで弾く
+   */
+  boginRanks: [4, 5],
+  /**
+   * 棋譜バーに出し続ける囲い・戦法の名前は、形が崩れたあと自分がこの手数だけ指しても
+   * 戻らなければ消す。すぐ消さないのは、高美濃→銀冠の組み替えや玉が一時的に逃げただけで
+   * 名前が出たり消えたりしないため
+   */
+  keptGraceMoves: 2,
+};

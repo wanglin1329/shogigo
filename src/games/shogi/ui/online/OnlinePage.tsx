@@ -24,11 +24,13 @@ import { NameDialog } from './NameDialog'
 import { OnlineGame } from './OnlineGame'
 import type { OnlineGameModel } from './OnlineGame'
 import { RankBadge } from './RankBadge'
+import { TutorialGame } from './TutorialGame'
 
 type Screen =
   | { kind: 'lobby' }
   | { kind: 'room'; code: string; token: string; initial?: RoomEntry; matchType: 'invite' | 'matchmaking' }
   | { kind: 'bot'; options: BotGameOptions }
+  | { kind: 'tutorial' }
 
 const TIME_CONTROLS: { value: string; label: string; tc: TimeControl }[] = [
   { value: 'none', label: '時間制限なし', tc: { type: 'none', seconds: 0 } },
@@ -185,6 +187,18 @@ export function OnlinePage({ roomParam }: { roomParam: string | null }) {
       />
     )
   }
+  if (screen.kind === 'tutorial') {
+    return (
+      <TutorialGame
+        settings={settings}
+        onLobby={() => toLobby()}
+        onSeek={() => {
+          toLobby()
+          seek()
+        }}
+      />
+    )
+  }
   if (screen.kind === 'bot') {
     return (
       <BotSession
@@ -232,9 +246,19 @@ export function OnlinePage({ roomParam }: { roomParam: string | null }) {
               1手30秒
             </p>
             {ready && !unlocked && (
-              <p className="setting-warn">
-                はじめての方は、まず<a href="/">AIとの対局</a>で1回勝つと、だれかと対局できるようになります。
-              </p>
+              <div className="setting-warn">
+                <p>
+                  はじめての方は、まず練習対局に勝つか、<a href="/">AIとの対局</a>で1回勝つと、だれかと対局できるようになります。
+                </p>
+                <button type="button" className="btn btn-primary" onClick={() => setScreen({ kind: 'tutorial' })}>
+                  練習対局をはじめる
+                </button>
+              </div>
+            )}
+            {ready && unlocked && (
+              <button type="button" className="chip" onClick={() => setScreen({ kind: 'tutorial' })}>
+                練習対局（COMが手加減します）
+              </button>
             )}
           </>
         )}

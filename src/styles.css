@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+/* Feature stylesheets (one per area, so parallel work does not collide). */
+@import './styles/waza.css';
+@import './styles/records.css';
+@import './styles/board-mode.css';
 
 :root {
   color-scheme: light;
@@ -839,6 +843,7 @@ body {
   font-size: 14px;
 }
 .setting-toggle input {
+  flex-shrink: 0;
   width: 20px;
   height: 20px;
   accent-color: var(--shu);

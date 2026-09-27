@@ -15,21 +15,29 @@ import type { Move, Player } from '../core/engine'
 import { parseUsiMove } from '../core/kifu/moves'
 import { decodeKifuParam } from '../core/kifu/url'
 import { atEnd, currentState, openRecord, play, resign, seek, visibleOutcome } from '../core/record'
-import type { GameView } from '../core/record'
+import type { GameRecord, GameView } from '../core/record'
+import { gameWaza } from '../core/waza/tracker'
 import { readJson, writeJson } from '../../../site/storage'
 import type { MoveAnimation } from './Board'
 import { playMoveSound, unlockAudio, vibrate } from './feedback'
 import { FirstMoveDemo } from './FirstMoveDemo'
 import { GameBoard } from './GameBoard'
 import { KifuBar } from './KifuBar'
+import { KifuImportDialog } from './KifuImportDialog'
 import { LevelPicker } from './LevelPicker'
+import { loadGameMeta, newGameMeta } from './records/gameMeta'
+import type { GameMeta } from './records/gameMeta'
+import { useRecordSaver } from './records/useRecordSaver'
 import { ResultDialog } from './ResultDialog'
+import { RecordSaveNote, WazaList } from './ResultExtras'
 import { SettingsDialog } from './SettingsDialog'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './settings'
 import type { ShogiSettings } from './settings'
 import { positionKey, useAiOpponent } from './useAiOpponent'
 import { useBoardInput } from './useBoardInput'
 import { EMPTY_RECORD, useShogiGame } from './useShogiGame'
+import { WAZA_COPY } from './waza-copy'
+import { useWazaDetection, WazaEffect } from './WazaEffect'
 
 interface Progress {
   /** Levels the player has beaten at least once (unlocks the next legendary level). */
@@ -40,10 +48,8 @@ interface Progress {
 }
 
 const COUNTED_KEEP = 30
-
-function newGameId(): string {
-  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
-}
+const META_KEY = 'shogi.ai.gameMeta'
+const BOTH_SIDES: readonly Player[] = ['sente', 'gote']
 
 interface Flash {
   text: string
@@ -55,7 +61,7 @@ interface ResetUndo {
   view: GameView
   level: AiLevelId
   side: Player
-  gameId: string
+  meta: GameMeta
 }
 
 const DEMO_IDLE_MS = 6000
@@ -70,6 +76,10 @@ const RESET_UNDO_MIN_PLIES = 3
 
 let flashSeq = 0
 
+function wazaIdsOf(view: GameView, owners: readonly Player[]): string[] {
+  return gameWaza(view.record.initialSfen, view.record.moves, owners).map((e) => e.id)
+}
+
 /** A kifu opened from a share link (`/?k=…&m=…`), applied after hydration. */
 export interface SharedKifuLink {
   k: string
@@ -81,23 +91,25 @@ function clearShareParams() {
 }
 
 export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null }) {
-  const [review, setReview] = useState<{ plies: number } | null>(null)
+  const [review, setReview] = useState<{ plies: number; source: 'shared' | 'imported' } | null>(null)
   const { view, restored, update, reload } = useShogiGame('shogi.ai.game', !review)
   const [settings, setSettings] = useState<ShogiSettings>(DEFAULT_SETTINGS)
   const [progress, setProgress] = useState<Progress>({ beaten: [], wins: 0, counted: [] })
   const progressRef = useRef(progress)
-  const gameId = useRef<string>('')
+  /** The game on the board (its id counts wins once and keys its 対局記録). */
+  const game = useRef<GameMeta>({ id: '', startedAt: 0 })
   const [level, setLevel] = useState<AiLevelId>(DEFAULT_AI_LEVEL)
   const [notice, setNotice] = useState<Flash | null>(null)
   const [checkLineVisible, setCheckLineVisible] = useState(false)
   const [resetUndo, setResetUndo] = useState<ResetUndo | null>(null)
-  const [dialog, setDialog] = useState<'result' | 'settings' | 'level' | null>(null)
+  const [dialog, setDialog] = useState<'result' | 'settings' | 'level' | 'import' | null>(null)
   const [pendingSide, setPendingSide] = useState<Player | null>(null)
   const [kifuOpen, setKifuOpen] = useState(false)
   const [confirmResign, setConfirmResign] = useState(false)
   const [unlockedNow, setUnlockedNow] = useState<AiLevelId | null>(null)
   const [animation, setAnimation] = useState<MoveAnimation | null>(null)
   const [demo, setDemo] = useState<string | null>(null)
+  const records = useRecordSaver()
 
   // ------------------------------------------------------------ restore prefs
   useEffect(() => {
@@ -109,15 +121,16 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     const loaded = { beaten, wins: typeof p?.wins === 'number' ? p.wins : 0, counted }
     progressRef.current = loaded
     setProgress(loaded)
-    gameId.current = readJson<string>('shogi.ai.gameId') ?? startGameId()
+    // 'shogi.ai.gameId' is where the id lived before 対局記録: keep it, or a won game could count twice.
+    game.current = loadGameMeta(META_KEY, readJson<string>('shogi.ai.gameId'))
     setLevel(resolvePlayableLevel(readJson('shogi.ai.level'), new Set(beaten)))
   }, [])
 
   /** A new game (new 新規対局, or branching from a shared kifu) gets a new id. */
-  function startGameId(): string {
-    gameId.current = newGameId()
-    writeJson('shogi.ai.gameId', gameId.current)
-    return gameId.current
+  function startGameId() {
+    game.current = newGameMeta()
+    writeJson(META_KEY, game.current)
+    records.reset()
   }
 
   const flash = useCallback((text: string, tone: Flash['tone']) => {
@@ -147,11 +160,21 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
       flash('棋譜の途中に読めない手がありました。リンクが壊れている可能性があります', 'warn')
       return
     }
+    openReview(opened, 'shared')
+  }, [restored, shared, sharedHandled, update, flash])
+
+  /** Show a kifu to browse; moving a piece starts a game from that position (docs/PLAN.md §5.3-13). */
+  function openReview(opened: GameView, source: 'shared' | 'imported') {
+    ai.cancel()
     update(() => opened)
-    setReview({ plies: opened.record.moves.length })
+    setReview({ plies: opened.record.moves.length, source })
     setDialog(null)
     setKifuOpen(true)
-  }, [restored, shared, sharedHandled, update, flash])
+  }
+
+  function openImported(record: GameRecord) {
+    openReview(openRecord(record, 0), 'imported')
+  }
 
   function leaveReview() {
     clearShareParams()
@@ -166,6 +189,14 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
   const outcome = visibleOutcome(view)
   // A shared kifu is shown from 先手's side unless the player flips it.
   const flipped = settings.flipped !== (!review && humanSide === 'gote')
+  // In a kifu being browsed both sides are "yours": the moves are the player's to study.
+  const waza = useWazaDetection({
+    initialSfen: view.record.initialSfen,
+    moves: view.record.moves,
+    cursor: view.cursor,
+    owners: review ? BOTH_SIDES : [humanSide],
+  })
+  const kept = waza.keptAt(view.cursor)
 
   // ------------------------------------------------------------ AI
   const ai = useAiOpponent({
@@ -280,13 +311,27 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     if (!result) return
     input.clear()
     const current = progressRef.current
-    if (result.winner === me && !current.counted.includes(gameId.current)) {
+    records.save({
+      id: game.current.id,
+      startedAt: game.current.startedAt,
+      endedAt: Date.now(),
+      mode: 'ai',
+      player: me,
+      winner: result.winner === 'draw' ? null : result.winner,
+      reason: result.reason,
+      initialSfen: next.record.initialSfen,
+      moves: next.record.moves.slice(0, result.plies),
+      opponentName: 'AI',
+      aiLevel: getAiLevel(level).label,
+      wazaIds: wazaIdsOf(next, [me]),
+    })
+    if (result.winner === me && !current.counted.includes(game.current.id)) {
       const unlock = levelUnlockedByBeating(level)
       const already = current.beaten.includes(level)
       const updated: Progress = {
         beaten: already ? current.beaten : [...current.beaten, level],
         wins: current.wins + 1,
-        counted: [...current.counted, gameId.current].slice(-COUNTED_KEEP),
+        counted: [...current.counted, game.current.id].slice(-COUNTED_KEEP),
       }
       progressRef.current = updated
       setProgress(updated)
@@ -356,7 +401,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
   // ------------------------------------------------------------ game control
   function newGame(options: { level?: AiLevelId; side?: Player } = {}) {
     const hasProgress = view.record.moves.length >= RESET_UNDO_MIN_PLIES && !view.outcome
-    if (hasProgress) setResetUndo({ view, level, side: humanSide, gameId: gameId.current })
+    if (hasProgress) setResetUndo({ view, level, side: humanSide, meta: game.current })
     if (options.level) {
       setLevel(options.level)
       writeJson('shogi.ai.level', options.level)
@@ -379,8 +424,8 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     if (!resetUndo) return
     ai.cancel()
     update(() => resetUndo.view)
-    gameId.current = resetUndo.gameId
-    writeJson('shogi.ai.gameId', resetUndo.gameId)
+    game.current = resetUndo.meta
+    writeJson(META_KEY, resetUndo.meta)
     setLevel(resetUndo.level)
     writeJson('shogi.ai.level', resetUndo.level)
     if (resetUndo.side !== humanSide) changeSettings({ ...settings, aiPlayerSide: resetUndo.side })
@@ -457,7 +502,9 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
       {review && (
         <div className="review-banner" role="status">
           <div>
-            <strong>共有された棋譜（{review.plies}手）</strong>
+            <strong>
+              {review.source === 'shared' ? '共有された棋譜' : '読み込んだ棋譜'}（{review.plies}手）
+            </strong>
             <span>駒を動かすと、{view.cursor}手目の局面から続きをAIと指せます</span>
           </div>
           <button type="button" className="chip" onClick={leaveReview}>
@@ -477,7 +524,12 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
         lastMove={lastMove}
         animation={animation}
         showCheckLine={checkLineVisible || dialog === 'result'}
-        overlay={demo ? <FirstMoveDemo text={demo} /> : null}
+        overlay={
+          <>
+            {demo && <FirstMoveDemo text={demo} />}
+            <WazaEffect waza={waza} trigger={animation?.id ?? null} ended={!!outcome} flipped={flipped} level={settings.wazaFx} />
+          </>
+        }
       >
         {ai.thinking && (
           <div className={`thinking ${flipped ? 'thinking-bottom' : ''}`} role="status">
@@ -496,6 +548,8 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
         open={kifuOpen}
         onToggle={() => setKifuOpen((o) => !o)}
         onJump={goTo}
+        onImport={() => setDialog('import')}
+        keptName={kept ? WAZA_COPY[kept.id].name : null}
         turnLabel={outcome ? '対局終了' : `手番：${sideLabel(state.currentPlayer)}`}
       />
 
@@ -568,7 +622,10 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
           setKifuOpen(true)
         }}
         onNext={() => newGame(unlockedNow ? { level: unlockedNow } : {})}
-      />
+      >
+        <WazaList entries={dialog === 'result' ? waza.summary() : []} />
+        <RecordSaveNote status={records.status} onRetry={records.retry} />
+      </ResultDialog>
       <SettingsDialog
         open={dialog === 'settings'}
         settings={settings}
@@ -581,6 +638,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
         view={view}
         level={level}
       />
+      <KifuImportDialog open={dialog === 'import'} onClose={() => setDialog(null)} onOpen={openImported} />
       <LevelPicker
         open={dialog === 'level'}
         current={level}

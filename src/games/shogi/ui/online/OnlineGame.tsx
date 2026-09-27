@@ -7,6 +7,7 @@ import type { GameState, Move, Player } from '../../core/engine'
 import { parseUsiMove } from '../../core/kifu/moves'
 import { openRecord } from '../../core/record'
 import type { GameView } from '../../core/record'
+import { gameWaza } from '../../core/waza/tracker'
 import type { BotReport } from '../../online/botGame'
 import { formatClock, isTimed, useClock } from '../../online/clock'
 import type { SideClock } from '../../online/clock'
@@ -20,9 +21,13 @@ import { playMoveSound, vibrate } from '../feedback'
 import { GameBoard } from '../GameBoard'
 import { KifuBar } from '../KifuBar'
 import { RESULT_REASON } from '../messages'
+import { useRecordSaver } from '../records/useRecordSaver'
+import { RecordSaveNote, WazaList } from '../ResultExtras'
 import type { ShogiSettings } from '../settings'
 import { useBoardInput } from '../useBoardInput'
-import { RankBadge } from './RankBadge'
+import { WAZA_COPY } from '../waza-copy'
+import { useWazaDetection, WazaEffect } from '../WazaEffect'
+import { RankBadge, rankLabel } from './RankBadge'
 
 /** What an online game looks like to the view: a real room or a local COM game. */
 export interface OnlineGameModel {
@@ -222,6 +227,8 @@ export function OnlineGame({
   // ------------------------------------------------------------ kifu
   const view: GameView = useMemo(() => openRecord({ initialSfen: null, moves: [...moves] }), [moves])
   const [kifuOpen, setKifuOpen] = useState(false)
+  const waza = useWazaDetection({ initialSfen: null, moves: view.record.moves, cursor: view.cursor, owners: [me] })
+  const kept = waza.keptAt(view.cursor)
 
   const nameOf = (side: Player) => {
     if (side === me) return 'あなた'
@@ -266,6 +273,37 @@ export function OnlineGame({
     const p = me === 'sente' ? match.sente_promoted : match.gote_promoted
     return r === null || d === null ? null : { rating: r, delta: d, promoted: p }
   })()
+  // ------------------------------------------------------------ 対局記録
+  // Saved when the game ends, and again (same id) once the rating is known:
+  // a COM game reports its result after the end.
+  const records = useRecordSaver()
+  const saveRecord = useRef(() => {})
+  saveRecord.current = () => {
+    const startedAt = Date.parse(match.started_at ?? match.created_at)
+    const endedAt = match.ended_at ? Date.parse(match.ended_at) : Date.now()
+    const oppRating = opp === 'sente' ? match.sente_rating : match.gote_rating
+    records.save({
+      // Room codes are reused once a room has expired: the creation time makes the id unique.
+      id: `${model.kind === 'bot' ? 'bot' : match.room_code}:${match.created_at}`,
+      startedAt,
+      endedAt: Math.max(startedAt, endedAt),
+      mode: model.kind === 'bot' ? 'bot' : 'online',
+      player: me,
+      winner: match.winner === 'draw' ? null : match.winner,
+      reason: match.result_reason ?? 'unknown',
+      initialSfen: null,
+      moves: [...moves],
+      opponentName: nameOf(opp),
+      opponentRank: rankLabel(rankOf(opp)),
+      opponentRating: oppRating,
+      wazaIds: gameWaza(null, moves, [me]).map((e) => e.id),
+    })
+  }
+  const ratingKey = rating ? `${rating.rating}` : ''
+  useEffect(() => {
+    if (over && started) saveRecord.current()
+  }, [over, started, ratingKey])
+
   const tone = match.winner === 'draw' ? 'draw' : match.winner === me ? 'win' : 'lose'
   const title = tone === 'draw' ? '引き分け' : tone === 'win' ? 'あなたの勝ち！' : `${nameOf(opp)}の勝ち`
 
@@ -284,12 +322,15 @@ export function OnlineGame({
         animation={animation}
         showCheckLine={checkLine}
         overlay={
-          startOverlay ? (
-            <div className="start-overlay" role="status">
-              <strong>対局開始</strong>
-              <span>あなたは{me === 'sente' ? '先手（先に指す）' : '後手'}です</span>
-            </div>
-          ) : null
+          <>
+            {startOverlay && (
+              <div className="start-overlay" role="status">
+                <strong>対局開始</strong>
+                <span>あなたは{me === 'sente' ? '先手（先に指す）' : '後手'}です</span>
+              </div>
+            )}
+            <WazaEffect waza={waza} trigger={animation?.id ?? null} ended={over} flipped={flipped} level={settings.wazaFx} />
+          </>
         }
       />
       {playerRow(me)}
@@ -309,6 +350,7 @@ export function OnlineGame({
         view={view}
         open={kifuOpen}
         onToggle={() => setKifuOpen((o) => !o)}
+        keptName={kept ? WAZA_COPY[kept.id].name : null}
         turnLabel={over ? '対局終了' : `手番：${nameOf(position.currentPlayer)}`}
       />
 
@@ -400,6 +442,8 @@ export function OnlineGame({
           </p>
         )}
         {model.kind === 'bot' && model.report?.status === 'sending' && <p className="result-note">結果を送信しています…</p>}
+        {resultOpen && <WazaList entries={waza.summary()} />}
+        <RecordSaveNote status={records.status} onRetry={records.retry} />
         <button type="button" className="btn btn-primary result-next" onClick={onAgain}>
           {againLabel}
         </button>

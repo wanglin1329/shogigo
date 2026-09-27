@@ -232,9 +232,10 @@ export function createShogiAi(options: ShogiAiOptions = {}): ShogiAi {
           lastMoveDetail: lastMoveDetail(request.usiMoves),
           aiDifficulty: level,
           aiPlayer: request.aiSide,
-          josekiEnabled: state !== null, // the joseki lines assume the 平手 start
+          josekiEnabled: state !== null && request.joseki !== false, // the joseki lines assume the 平手 start
           currentJosekiPattern: state?.pattern ?? null,
           josekiMoveIndex: state?.index ?? 0,
+          ...(request.weakness ? { weakness: request.weakness } : {}),
           requestId: id,
         },
       })

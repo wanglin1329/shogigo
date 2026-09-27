@@ -1,12 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/board')({ component: Board })
+import { BoardMode } from '../games/shogi/ui/BoardMode'
+import { ModeTabs } from '../site/ModeTabs'
+
+export const Route = createFileRoute('/board')({
+  head: () => ({ meta: [{ title: '将棋盤 — ふたりで指す' }] }),
+  component: Board,
+})
 
 function Board() {
   return (
-    <main className="mx-auto max-w-xl px-4 py-10">
-      <h1 className="text-2xl font-bold">将棋盤（P0 基盤）</h1>
-      <p className="mt-4">プリレンダリングされたページです（board.html）。</p>
+    <main className="px-2 py-4 sm:py-8">
+      <ModeTabs current="board" />
+      <h1 className="sr-only">将棋盤（ひとつの端末でふたりで指す）</h1>
+      <BoardMode />
     </main>
   )
 }

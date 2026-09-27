@@ -1,0 +1,41 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+/* ------------------------------------------------------------------ kifu import */
+.import-field {
+  display: grid;
+  gap: 6px;
+}
+.import-field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d6cab2;
+  border-radius: 8px;
+  font: 13px/1.5 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  resize: vertical;
+}
+.import-file {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.import-file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.import-ok {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #e3f1e6;
+  font-size: 13px;
+}
+
+/* ------------------------------------------------------------------ board mode */
+.board-autoflip {
+  min-height: 44px;
+  font-size: 13px;
+}

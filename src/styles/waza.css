@@ -1,0 +1,249 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+/* 手筋・囲い・戦法の演出 — rendered inside .board-grid (percentages = squares). */
+
+.waza-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+
+/* The square the move landed on. */
+.waza-ring {
+  position: absolute;
+  width: calc(100% / 9);
+  height: calc(100% / 9);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px var(--gold),
+    0 0 14px 4px rgb(230 177 47 / 0.55);
+  animation: waza-ring 0.9s ease-out both;
+}
+
+/* Target pieces (tesuji) and the castle's pieces. */
+.waza-frame {
+  position: absolute;
+  width: calc(100% / 9);
+  height: calc(100% / 9);
+  box-shadow: inset 0 0 0 3px var(--shu);
+  border-radius: 4px;
+  animation: waza-frame 0.35s ease-out both;
+}
+.waza-frame-castle {
+  box-shadow: inset 0 0 0 3px var(--gold);
+  background: rgb(230 177 47 / 0.16);
+}
+
+.waza-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.waza-lines line {
+  stroke: var(--shu);
+  stroke-width: 0.06;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: waza-draw 0.5s 0.15s ease-out forwards;
+}
+
+/* Cut-in band: a strip of washi across the board with the name in brush-like type. */
+.waza-band {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 38%;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0;
+  background: linear-gradient(90deg, transparent, var(--card) 12%, var(--card) 88%, transparent);
+  border-top: 2px solid var(--shu);
+  border-bottom: 2px solid var(--shu);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  animation: waza-band 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.waza-band-name {
+  font-family: var(--piece-font);
+  font-weight: 700;
+  font-size: calc(var(--cell) * 0.9);
+  color: var(--shu);
+  letter-spacing: 0.06em;
+}
+.waza-big .waza-band-name {
+  font-size: calc(var(--cell) * 1.05);
+}
+.waza-band-kana {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+/* The card: name + one line, along the bottom of the board. */
+.waza-card {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  translate: -50% 0;
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  max-width: 92%;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border-left: 5px solid var(--gold);
+  background: var(--card);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.28);
+  animation: waza-card 0.3s ease-out both;
+}
+.waza-card-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--piece-font);
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--ink);
+}
+.waza-card-kind {
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.waza-card-first {
+  color: var(--shu);
+  font-size: 12px;
+  font-weight: 700;
+}
+.waza-card-line {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@keyframes waza-ring {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+  60% {
+    opacity: 1;
+    scale: 1.15;
+  }
+  to {
+    scale: 1;
+  }
+}
+@keyframes waza-frame {
+  from {
+    opacity: 0;
+    scale: 1.3;
+  }
+}
+@keyframes waza-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes waza-band {
+  0% {
+    opacity: 0;
+    translate: -30% 0;
+  }
+  18% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  82% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  100% {
+    opacity: 0;
+    translate: 20% 0;
+  }
+}
+@keyframes waza-card {
+  from {
+    opacity: 0;
+    translate: -50% 8px;
+  }
+}
+@keyframes waza-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: no movement, only fades (class set from JS, media query as a backstop). */
+.waza-still .waza-ring,
+.waza-still .waza-frame,
+.waza-still .waza-band,
+.waza-still .waza-card {
+  animation: waza-fade 0.3s ease-out both;
+  scale: none;
+}
+.waza-still .waza-lines line {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .waza-ring,
+  .waza-frame,
+  .waza-band,
+  .waza-card {
+    animation: waza-fade 0.3s ease-out both !important;
+  }
+  .waza-lines line {
+    animation: none !important;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ waza chips (kifu bar, result) */
+.kifu-waza,
+.waza-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fbe9c5;
+  color: #6b4a00;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.waza-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.result-waza {
+  margin-top: 12px;
+  text-align: left;
+}
+.result-waza-caption {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.result-waza .waza-list {
+  margin-top: 4px;
+}
+.result-save {
+  margin-top: 10px;
+}
+.result-save .chip {
+  margin-left: 8px;
+}
+.result-save a {
+  color: var(--focus);
+  text-decoration: underline;
+}

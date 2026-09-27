@@ -35,6 +35,8 @@ export function KifuBar({
   open,
   onToggle,
   onJump,
+  onImport,
+  keptName = null,
   turnLabel,
 }: {
   view: GameView
@@ -42,6 +44,10 @@ export function KifuBar({
   onToggle: () => void
   /** Jump to a move; omitted where the board must stay on the live position (online). */
   onJump?: (cursor: number) => void
+  /** Offer 「棋譜を読み込む」 (AI and board modes). */
+  onImport?: () => void
+  /** A castle / strategy the player is keeping (shown as a chip). */
+  keptName?: string | null
   turnLabel: string
 }) {
   // Notation is rebuilt only for moves not seen before (buildNotation reuses the prefix).
@@ -90,6 +96,7 @@ export function KifuBar({
         </span>
         <span className="kifu-title">棋譜</span>
         <span className="kifu-current">{current ? `${current.ply}手目 ${current.text}` : '開始局面'}</span>
+        {keptName && <span className="kifu-waza">{keptName}</span>}
         <span className="kifu-turn">{turnLabel}</span>
       </button>
       {open && (
@@ -161,6 +168,11 @@ export function KifuBar({
             >
               KIFを保存
             </button>
+            {onImport && (
+              <button type="button" className="chip" onClick={onImport}>
+                棋譜を読み込む
+              </button>
+            )}
           </div>
           {copied === 'failed' && <p className="kifu-error">コピーできませんでした。長押しで選択してコピーしてください。</p>}
         </div>

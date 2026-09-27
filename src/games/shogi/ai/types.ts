@@ -28,6 +28,14 @@ export interface AiRequest {
   /** Current position (== replay of initialSfen + usiMoves). */
   state: GameState
   aiSide: Player
+  /**
+   * JS levels only: deliberate-mistake knobs of ai-worker.js (exchange,
+   * safeMove, safeDrop, dropBlind, farCapture, kingWeight), overriding the
+   * level's defaults. Used by the tutorial to go easy on beginners.
+   */
+  weakness?: Record<string, number>
+  /** JS levels only: play the opening book (default true). */
+  joseki?: boolean
 }
 
 export type AiResult =

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { createShogiAi } from '../ai'
-import type { AiLevelId, AiResult, ShogiAi } from '../ai/types'
+import type { AiLevelId, AiRequest, AiResult, ShogiAi } from '../ai/types'
 import type { Move, Player } from '../core/engine'
 import { atEnd, currentState } from '../core/record'
 import type { GameView } from '../core/record'
@@ -51,8 +51,10 @@ export function useAiOpponent(options: {
   level: AiLevelId
   aiSide: Player
   callbacks: AiCallbacks
+  /** Extra request fields for JS levels (tutorial: weakness, no joseki). */
+  tuning?: Pick<AiRequest, 'weakness' | 'joseki'>
 }) {
-  const { enabled, view, level, aiSide } = options
+  const { enabled, view, level, aiSide, tuning } = options
   const ai = useRef<ShogiAi | null>(null)
   const callbacks = useRef(options.callbacks)
   callbacks.current = options.callbacks
@@ -108,6 +110,7 @@ export function useAiOpponent(options: {
         usiMoves: view.record.moves,
         state,
         aiSide,
+        ...tuning,
       })
       .then(async (result: AiResult) => {
         const wait = MIN_THINK_MS - (performance.now() - started)
@@ -127,7 +130,7 @@ export function useAiOpponent(options: {
       alive = false
       ai.current?.cancel()
     }
-  }, [enabled, view, level, aiSide])
+  }, [enabled, view, level, aiSide, tuning])
 
   return {
     thinking,

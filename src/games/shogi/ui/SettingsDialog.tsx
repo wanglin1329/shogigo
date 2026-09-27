@@ -107,6 +107,25 @@ export function SettingsDialog({
       </fieldset>
 
       <fieldset className="setting-group">
+        <legend>手筋・囲いの演出</legend>
+        <div className="segmented" role="radiogroup">
+          {(
+            [
+              ['loud', '派手'],
+              ['std', '標準'],
+              ['calm', '控えめ'],
+              ['off', 'なし'],
+            ] as const
+          ).map(([value, label]) => (
+            <label key={value} className="segment">
+              <input type="radio" name="waza-fx" checked={settings.wazaFx === value} onChange={() => set('wazaFx', value)} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="setting-group">
         <legend>表示と操作</legend>
         <Toggle label="王手や、指せない理由を盤上で知らせる" checked={settings.moveHints} onChange={(v) => set('moveHints', v)} />
         <Toggle label="駒音を鳴らす" checked={settings.sound} onChange={(v) => set('sound', v)} />

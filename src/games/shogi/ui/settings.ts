@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+import { isWazaFxLevel } from '../core/waza/effect'
+import type { WazaFxLevel } from '../core/waza/effect'
 import { readJson, writeJson } from '../../../site/storage'
 
 export type PieceStyle = 'text' | 'guide'
@@ -23,6 +25,10 @@ export interface ShogiSettings {
   hideRank: boolean
   /** Spoken countdown on my own clock in timed online games. */
   byoyomi: Byoyomi
+  /** Board mode: turn the board toward the side to move after every move. */
+  boardAutoFlip: boolean
+  /** 手筋・囲いの演出: 派手 / 標準 / 控えめ / なし. */
+  wazaFx: WazaFxLevel
 }
 
 export const DEFAULT_SETTINGS: ShogiSettings = {
@@ -35,6 +41,8 @@ export const DEFAULT_SETTINGS: ShogiSettings = {
   botFallback: true,
   hideRank: false,
   byoyomi: 'soft',
+  boardAutoFlip: false,
+  wazaFx: 'std',
 }
 
 const KEY = 'shogi.settings'
@@ -50,6 +58,7 @@ export function loadSettings(): ShogiSettings {
   if (merged.aiPlayerSide !== 'sente' && merged.aiPlayerSide !== 'gote') merged.aiPlayerSide = 'sente'
   if (merged.pieceStyle !== 'text' && merged.pieceStyle !== 'guide') merged.pieceStyle = 'text'
   if (!['full', 'soft', 'off'].includes(merged.byoyomi)) merged.byoyomi = 'soft'
+  if (!isWazaFxLevel(merged.wazaFx)) merged.wazaFx = 'std'
   return merged
 }
 

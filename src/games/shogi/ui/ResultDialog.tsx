@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 
 import type { Player } from '../core/engine'
 import { currentState } from '../core/record'
@@ -47,6 +48,7 @@ export function ResultDialog({
   pieceStyle,
   onClose,
   onNext,
+  children,
 }: {
   open: boolean
   outcome: Outcome | null
@@ -60,6 +62,8 @@ export function ResultDialog({
   pieceStyle: PieceStyle
   onClose: () => void
   onNext: () => void
+  /** Extra lines under the thumbnail (waza of the game, 対局記録). */
+  children?: ReactNode
 }) {
   const [copied, setCopied] = useState(false)
   useEffect(() => {
@@ -98,6 +102,7 @@ export function ResultDialog({
         </p>
       )}
       <Thumbnail view={view} flipped={flipped} pieceStyle={pieceStyle} onClick={onClose} />
+      {children}
       <div className="result-share">
         <button
           type="button"

@@ -8,7 +8,8 @@ import handler from '@tanstack/react-start/server-entry'
 import { handleApi } from './api'
 import { withDefaultCacheControl } from './cache-policy'
 
-export { MatchRoom, Matchmaker } from './games/shogi/server/placeholder-rooms'
+export { MatchRoom } from './games/shogi/server/match-room'
+export { Matchmaker } from './games/shogi/server/matchmaker'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

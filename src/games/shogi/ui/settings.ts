@@ -3,6 +3,7 @@
 import { readJson, writeJson } from '../../../site/storage'
 
 export type PieceStyle = 'text' | 'guide'
+export type Byoyomi = 'full' | 'soft' | 'off'
 
 export interface ShogiSettings {
   /** Side the human plays against the AI. */
@@ -16,6 +17,12 @@ export interface ShogiSettings {
   haptics: boolean
   /** Flip the board manually (AI mode flips automatically when playing 後手). */
   flipped: boolean
+  /** Random match: play COM when nobody is found in time. */
+  botFallback: boolean
+  /** Hide 段級位/実力値 (mine to others, and theirs to me). */
+  hideRank: boolean
+  /** Spoken countdown on my own clock in timed online games. */
+  byoyomi: Byoyomi
 }
 
 export const DEFAULT_SETTINGS: ShogiSettings = {
@@ -25,6 +32,9 @@ export const DEFAULT_SETTINGS: ShogiSettings = {
   sound: true,
   haptics: true,
   flipped: false,
+  botFallback: true,
+  hideRank: false,
+  byoyomi: 'soft',
 }
 
 const KEY = 'shogi.settings'
@@ -39,6 +49,7 @@ export function loadSettings(): ShogiSettings {
   }
   if (merged.aiPlayerSide !== 'sente' && merged.aiPlayerSide !== 'gote') merged.aiPlayerSide = 'sente'
   if (merged.pieceStyle !== 'text' && merged.pieceStyle !== 'guide') merged.pieceStyle = 'text'
+  if (!['full', 'soft', 'off'].includes(merged.byoyomi)) merged.byoyomi = 'soft'
   return merged
 }
 

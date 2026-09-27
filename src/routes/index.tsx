@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { ShogiGame } from '../games/shogi/ui/ShogiGame'
 import type { SharedKifuLink } from '../games/shogi/ui/ShogiGame'
+import { ModeTabs } from '../site/ModeTabs'
 
 // Prerendered page. Search params (e.g. `?k=` kifu links) are typed here but
 // only applied after hydration: the static HTML was rendered without them, so
@@ -22,6 +23,7 @@ function Home() {
 
   return (
     <main className="px-2 py-4 sm:py-8">
+      <ModeTabs current="ai" />
       <h1 className="sr-only">将棋 — AIと対局</h1>
       <ShogiGame shared={shared} />
     </main>

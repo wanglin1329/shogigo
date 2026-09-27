@@ -33,6 +33,17 @@
 		]
 	},
 	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["MatchRoom", "Matchmaker"] }],
+	// Coarse per-IP limits per endpoint group (Cloudflare Rate Limiting: per data
+	// centre, eventually consistent). Hard limits live in D1. Schools put many
+	// players behind one IP, so play traffic is allowed generously.
+	"ratelimits": [
+		{ "name": "RL_CREATE", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+		{ "name": "RL_JOIN", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } },
+		{ "name": "RL_QUEUE", "namespace_id": "1003", "simple": { "limit": 10, "period": 60 } },
+		{ "name": "RL_STATS", "namespace_id": "1004", "simple": { "limit": 30, "period": 60 } },
+		{ "name": "RL_BOT_RESULT", "namespace_id": "1005", "simple": { "limit": 20, "period": 60 } },
+		{ "name": "RL_PLAY", "namespace_id": "1006", "simple": { "limit": 1200, "period": 60 } }
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",

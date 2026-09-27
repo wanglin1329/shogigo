@@ -114,6 +114,16 @@ export function SettingsDialog({
       </fieldset>
 
       <fieldset className="setting-group">
+        <legend>だれかと対局</legend>
+        <Toggle
+          label="相手がしばらく見つからないときは、COM（コンピュータ）と対局する"
+          checked={settings.botFallback}
+          onChange={(v) => set('botFallback', v)}
+        />
+        <Toggle label="段級位と実力値を表示しない" checked={settings.hideRank} onChange={(v) => set('hideRank', v)} />
+      </fieldset>
+
+      <fieldset className="setting-group">
         <legend>不具合のご報告</legend>
         <p className="setting-note">うまく動かないときは、この情報をお問い合わせに貼り付けてください。個人を特定する情報は含まれません。</p>
         <button

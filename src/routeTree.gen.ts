@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BoardRouteImport } from './routes/board'
+import { Route as OnlineRouteImport } from './routes/online'
 import { Route as TsumeRouteImport } from './routes/tsume'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const BoardRoute = BoardRouteImport.update({
   path: '/board',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnlineRoute = OnlineRouteImport.update({
+  id: '/online',
+  path: '/online',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TsumeRoute = TsumeRouteImport.update({
   id: '/tsume',
   path: '/tsume',
@@ -32,30 +38,34 @@ const TsumeRoute = TsumeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
+  '/online': typeof OnlineRoute
   '/tsume': typeof TsumeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
+  '/online': typeof OnlineRoute
   '/tsume': typeof TsumeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/board': typeof BoardRoute
+  '/online': typeof OnlineRoute
   '/tsume': typeof TsumeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/board' | '/tsume'
+  fullPaths: '/' | '/board' | '/online' | '/tsume'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/board' | '/tsume'
-  id: '__root__' | '/' | '/board' | '/tsume'
+  to: '/' | '/board' | '/online' | '/tsume'
+  id: '__root__' | '/' | '/board' | '/online' | '/tsume'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BoardRoute: typeof BoardRoute
+  OnlineRoute: typeof OnlineRoute
   TsumeRoute: typeof TsumeRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BoardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/online': {
+      id: '/online'
+      path: '/online'
+      fullPath: '/online'
+      preLoaderRoute: typeof OnlineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tsume': {
       id: '/tsume'
       path: '/tsume'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BoardRoute: BoardRoute,
+  OnlineRoute: OnlineRoute,
   TsumeRoute: TsumeRoute,
 }
 export const routeTree = rootRouteImport

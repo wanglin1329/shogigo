@@ -6,7 +6,8 @@
 import { handleApi } from '../src/api'
 import { withDefaultCacheControl } from '../src/cache-policy'
 
-export { MatchRoom, Matchmaker } from '../src/games/shogi/server/placeholder-rooms'
+export { MatchRoom } from '../src/games/shogi/server/match-room'
+export { Matchmaker } from '../src/games/shogi/server/matchmaker'
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

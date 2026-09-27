@@ -1,0 +1,1244 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright 2025~ Yuki Lab
+// Copyright 2026 the shogi project contributors
+// Modified 2026-09-27: payloads are built per viewer (redactRatings) so a
+//   player who hid their rank does not leak it, nor see the opponent's.
+// Modified 2026-09-27: import paths; payload state is PublicGameState
+// (toPublicState) — the DO still stores and uses the full GameState.
+
+// MatchRoom Durable Object — one instance and one SQLite row per online-match room.
+// WebSocket Hibernation pushes state changes, client pings track liveness without
+// waking the object, and alarms enforce disconnect outcomes and 24-hour expiry.
+// Room logic runs single-threaded inside the DO, while revision checks remain the
+// client-facing conflict protocol.
+
+import { DurableObject } from "cloudflare:workers";
+import { applyMove, createInitialGameState, GOTE, SENTE } from "../core/engine";
+import type { GameState, Move, Player } from "../core/engine";
+import { DISCONNECT_GRACE_MS, evaluateDisconnect } from "./disconnect";
+import type { DisconnectEval } from "./disconnect";
+import type {
+  DisconnectInfo,
+  MatchPayload,
+  MatchType,
+  MoveResult,
+  RoomResult,
+  ServerWsMessage,
+  SidePref,
+  TimeControlType,
+} from "./protocol";
+import { toPublicState } from "./protocol";
+import type { Score } from "../../../online/rating";
+import { applyMatchRating } from "./rating-store";
+
+export const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
+// Mirrors `showAfterMs` inside evaluateDisconnect (disconnect.ts): how long a
+// side must be unseen before the opponent sees the disconnect countdown.
+const DISCONNECT_SHOW_AFTER_MS = 15_000;
+// While a match is running the DO wakes at least this often as a safety net
+// (silent TCP death detection + authoritative state re-sync).
+const ACTIVE_TICK_MS = 60_000;
+// A WebSocket counts as "live" if its last ping auto-response (or open) is
+// newer than this. The client pings every 5s, but keep this at 25s: clients
+// running a year-long cached older script still ping only every 10s.
+const WS_FRESH_MS = 25_000;
+// Clocks start this long after the second player joins, so neither the 3s
+// match-start overlay (plus its 0.7s fade) nor the moment of noticing the
+// match eats into the first mover's allowance.
+const MATCH_START_BUFFER_MS = 5000;
+// A move arriving up to this long after turn_deadline still counts, and the
+// flag falls only then. The clock on screen still reads 0:00 at the deadline;
+// this only absorbs network delay (設計書 §14). The local COM game's timer in
+// online-match.js uses the same grace.
+const FLAG_GRACE_MS = 1000;
+// Whitelisted time-control presets (seconds). Keep in sync with the
+// friend-tc-total / friend-tc-per-move chip options in index.html.
+export const TC_ALLOWED: Record<"total" | "per_move", readonly number[]> = {
+  total: [600, 300, 180],
+  per_move: [60, 30, 10],
+};
+
+type MatchRow = {
+  room_code: string;
+  created_at: number;
+  started_at: number | null;
+  ended_at: number | null;
+  expires_at: number;
+  // "" means the sente seat is vacant (the creator chose gote). The column
+  // stays NOT NULL because pre-existing rooms carry that constraint and
+  // SQLite cannot drop it; "" is falsy so joined-checks read naturally.
+  sente_uid: string;
+  gote_uid: string | null;
+  sente_name: string | null;
+  gote_name: string | null;
+  state: string; // GameState as JSON
+  revision: number;
+  game_over: number;
+  winner: string | null;
+  result_reason: string | null;
+  disconnect_side: string | null;
+  disconnect_deadline: number | null;
+  last_seen_sente: number | null;
+  last_seen_gote: number | null;
+  // Friend-match settings + clocks (nullable: rooms created before this
+  // feature shipped lack them until the lazy ALTERs in loadRow run).
+  side_pref: string | null;
+  tc_type: string | null;
+  tc_seconds: number | null;
+  sente_time_ms: number | null; // total mode: remaining at turn start
+  gote_time_ms: number | null;
+  turn_started_at: number | null; // epoch ms; may sit in the future (start buffer)
+  turn_deadline: number | null; // epoch ms; unified alarm driver for both modes
+  // "invite" | "matchmaking"; NULL on rooms created before the matchmaking
+  // feature shipped (read as "invite" — every old room came from an invite URL).
+  match_type: string | null;
+  // 実力値・段級位（だれかと対戦のみ）。段級位は入室時に引いて固定し、対局中は動かさない。
+  // 実力値・変動幅・昇段ラベルは終局時に finalizeGameOver が1回だけ書く。
+  // rating_delta が NULL でないことが「実力値反映ずみ」の印になる。
+  sente_rank: number | null;
+  gote_rank: number | null;
+  sente_rank_visible: number;
+  gote_rank_visible: number;
+  sente_rating: number | null;
+  gote_rating: number | null;
+  sente_rating_delta: number | null;
+  gote_rating_delta: number | null;
+  sente_promoted: string | null;
+  gote_promoted: string | null;
+};
+
+// 先手から見た結果。実力値は先手視点の1つの数字で持ち回す
+function senteScoreFrom(winner: string | null): Score | null {
+  if (winner === SENTE) return 1;
+  if (winner === GOTE) return 0;
+  if (winner === "draw") return 0.5;
+  return null;
+}
+
+type WsAttachment = { side: Player; uid: string; openedAt: number };
+
+function err(code: string, message: string) {
+  return { code, message };
+}
+
+/**
+ * The opponent's rank, rating, delta and promotion are shown only when both
+ * players show their rank (research-C §4: hiding works both ways).
+ */
+export function redactRatings(match: MatchPayload, viewer: Player): MatchPayload {
+  const opponent: Player = viewer === SENTE ? GOTE : SENTE;
+  const bothVisible = match.sente_rank_visible && match.gote_rank_visible;
+  if (bothVisible) return match;
+  return {
+    ...match,
+    [`${opponent}_rank`]: null,
+    [`${opponent}_rating`]: null,
+    [`${opponent}_rating_delta`]: null,
+    [`${opponent}_promoted`]: null,
+  };
+}
+
+export class MatchRoom extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // Answer client keepalive pings without waking the object (uncharged).
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
+
+  // ---- storage helpers -------------------------------------------------
+
+  // Created only when a room is actually created: a DO instantiated by a
+  // guessed/expired room code must not write storage (a DO with zero storage
+  // and no alarm simply ceases to exist — that IS the cleanup).
+  private ensureSchema(): void {
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS match (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        room_code TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        started_at INTEGER,
+        ended_at INTEGER,
+        expires_at INTEGER NOT NULL,
+        sente_uid TEXT NOT NULL,
+        gote_uid TEXT,
+        sente_name TEXT,
+        gote_name TEXT,
+        state TEXT NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 0,
+        game_over INTEGER NOT NULL DEFAULT 0,
+        winner TEXT,
+        result_reason TEXT,
+        disconnect_side TEXT,
+        disconnect_deadline INTEGER,
+        last_seen_sente INTEGER,
+        last_seen_gote INTEGER,
+        side_pref TEXT,
+        tc_type TEXT,
+        tc_seconds INTEGER,
+        sente_time_ms INTEGER,
+        gote_time_ms INTEGER,
+        turn_started_at INTEGER,
+        turn_deadline INTEGER,
+        match_type TEXT,
+        sente_rank INTEGER,
+        gote_rank INTEGER,
+        sente_rank_visible INTEGER NOT NULL DEFAULT 0,
+        gote_rank_visible INTEGER NOT NULL DEFAULT 0,
+        sente_rating INTEGER,
+        gote_rating INTEGER,
+        sente_rating_delta INTEGER,
+        gote_rating_delta INTEGER,
+        sente_promoted TEXT,
+        gote_promoted TEXT
+      )
+    `);
+  }
+
+  // Rooms created before the friend-settings feature lack the newer columns;
+  // upgrade them in place once per DO wake. Every ALTER is individually
+  // swallowed: "duplicate column" on current tables, "no such table" on
+  // never-created rooms (where ALTER creates nothing, preserving the
+  // zero-storage-stays-zero guarantee).
+  private columnsEnsured = false;
+  private ensureColumns(): void {
+    if (this.columnsEnsured) return;
+    for (const ddl of [
+      "ALTER TABLE match ADD COLUMN started_at INTEGER",
+      "ALTER TABLE match ADD COLUMN ended_at INTEGER",
+      "ALTER TABLE match ADD COLUMN side_pref TEXT",
+      "ALTER TABLE match ADD COLUMN tc_type TEXT",
+      "ALTER TABLE match ADD COLUMN tc_seconds INTEGER",
+      "ALTER TABLE match ADD COLUMN sente_time_ms INTEGER",
+      "ALTER TABLE match ADD COLUMN gote_time_ms INTEGER",
+      "ALTER TABLE match ADD COLUMN turn_started_at INTEGER",
+      "ALTER TABLE match ADD COLUMN turn_deadline INTEGER",
+      "ALTER TABLE match ADD COLUMN match_type TEXT",
+      "ALTER TABLE match ADD COLUMN sente_rank INTEGER",
+      "ALTER TABLE match ADD COLUMN gote_rank INTEGER",
+      "ALTER TABLE match ADD COLUMN sente_rank_visible INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE match ADD COLUMN gote_rank_visible INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE match ADD COLUMN sente_rating INTEGER",
+      "ALTER TABLE match ADD COLUMN gote_rating INTEGER",
+      "ALTER TABLE match ADD COLUMN sente_rating_delta INTEGER",
+      "ALTER TABLE match ADD COLUMN gote_rating_delta INTEGER",
+      "ALTER TABLE match ADD COLUMN sente_promoted TEXT",
+      "ALTER TABLE match ADD COLUMN gote_promoted TEXT",
+    ]) {
+      try {
+        this.ctx.storage.sql.exec(ddl);
+      } catch {
+        // column already exists, or the table was never created
+      }
+    }
+    this.columnsEnsured = true;
+  }
+
+  private loadRow(): MatchRow | null {
+    this.ensureColumns();
+    try {
+      const rows = this.ctx.storage.sql
+        .exec<MatchRow>("SELECT * FROM match WHERE id = 1")
+        .toArray();
+      return rows.length > 0 ? rows[0] : null;
+    } catch {
+      // Table does not exist: never created, or wiped by the expiry alarm.
+      return null;
+    }
+  }
+
+  private activeRow(nowMs: number): MatchRow | null {
+    const row = this.loadRow();
+    if (!row) return null;
+    if (nowMs >= row.expires_at) return null; // expired; alarm will clean up
+    return row;
+  }
+
+  private touch(side: Player, nowMs: number): void {
+    const col = side === SENTE ? "last_seen_sente" : "last_seen_gote";
+    this.ctx.storage.sql.exec(`UPDATE match SET ${col} = ? WHERE id = 1`, nowMs);
+  }
+
+  // ---- presence / disconnect -------------------------------------------
+
+  // `exclude` skips a socket that is in the middle of closing —
+  // webSocketClose still sees it in getWebSockets() while the handler runs.
+  private sideSocketFreshness(side: Player, exclude?: WebSocket): number | null {
+    let newest: number | null = null;
+    for (const ws of this.ctx.getWebSockets(side)) {
+      if (ws === exclude) continue;
+      const att = ws.deserializeAttachment() as WsAttachment | null;
+      let ts = att?.openedAt ?? 0;
+      const auto = this.ctx.getWebSocketAutoResponseTimestamp(ws);
+      if (auto && auto.getTime() > ts) ts = auto.getTime();
+      if (newest === null || ts > newest) newest = ts;
+    }
+    return newest;
+  }
+
+  private effectiveLastSeen(
+    row: MatchRow,
+    side: Player,
+    exclude?: WebSocket,
+  ): number | null {
+    const stored = side === SENTE ? row.last_seen_sente : row.last_seen_gote;
+    const wsTs = this.sideSocketFreshness(side, exclude);
+    if (stored === null && wsTs === null) return null;
+    return Math.max(stored ?? 0, wsTs ?? 0);
+  }
+
+  private sideConnected(side: Player, nowMs: number, exclude?: WebSocket): boolean {
+    const ts = this.sideSocketFreshness(side, exclude);
+    return ts !== null && nowMs - ts < WS_FRESH_MS;
+  }
+
+  // Both seats occupied = the match has started. (The creator may sit either
+  // seat, so a single-seat check like `gote_uid` is no longer meaningful.)
+  private bothSeated(row: MatchRow): boolean {
+    return Boolean(row.sente_uid) && Boolean(row.gote_uid);
+  }
+
+  private tcType(row: MatchRow): TimeControlType {
+    const t = row.tc_type;
+    if ((t === "total" || t === "per_move") && (row.tc_seconds ?? 0) > 0) return t;
+    return "none";
+  }
+
+  private evaluate(row: MatchRow, nowMs: number): DisconnectEval {
+    const started = this.bothSeated(row) && !row.game_over;
+    const s = this.effectiveLastSeen(row, SENTE);
+    const g = this.effectiveLastSeen(row, GOTE);
+    return evaluateDisconnect({
+      nowMs,
+      started,
+      lastSeenSente: s !== null ? new Date(s).toISOString() : null,
+      lastSeenGote: g !== null ? new Date(g).toISOString() : null,
+    });
+  }
+
+  // ---- payload building --------------------------------------------------
+
+  /**
+   * The match as `viewer` may see it. Rank/rating fields of the opponent are
+   * only sent when both players show their rank: hiding (hr=1) keeps my rank
+   * from the opponent and theirs from me. My own fields are always mine to see.
+   */
+  private toPayload(row: MatchRow, dc: DisconnectEval | null, viewer: Player): MatchPayload {
+    return redactRatings(this.buildPayload(row, dc), viewer);
+  }
+
+  private buildPayload(row: MatchRow, dc: DisconnectEval | null): MatchPayload {
+    const gameOver = Boolean(row.game_over);
+    let dcSide: Player | null = null;
+    let dcDeadline: string | null = null;
+    if (gameOver) {
+      dcSide = (row.disconnect_side as Player | null) ?? null;
+      dcDeadline =
+        row.disconnect_deadline !== null
+          ? new Date(row.disconnect_deadline).toISOString()
+          : null;
+    } else if (dc) {
+      dcSide = dc.disconnect_side;
+      dcDeadline = dc.disconnect_deadline;
+    }
+    const tcType = this.tcType(row);
+    const sidePref = row.side_pref;
+    return {
+      room_code: row.room_code,
+      created_at: new Date(row.created_at).toISOString(),
+      started_at: typeof row.started_at === "number" ? new Date(row.started_at).toISOString() : null,
+      ended_at: typeof row.ended_at === "number" ? new Date(row.ended_at).toISOString() : null,
+      expires_at: new Date(row.expires_at).toISOString(),
+      sente_joined: Boolean(row.sente_uid),
+      gote_joined: Boolean(row.gote_uid),
+      sente_name: row.sente_name,
+      gote_name: row.gote_name,
+      // The DO keeps the full GameState; clients get it without the histories (§6.5-1).
+      state: toPublicState(JSON.parse(row.state) as GameState),
+      revision: row.revision,
+      game_over: gameOver,
+      winner: (row.winner as MatchPayload["winner"]) ?? null,
+      result_reason: row.result_reason,
+      disconnect_side: dcSide,
+      disconnect_deadline: dcDeadline,
+      side_pref:
+        sidePref === "sente" || sidePref === "gote" || sidePref === "random"
+          ? sidePref
+          : null,
+      match_type: row.match_type === "matchmaking" ? "matchmaking" : "invite",
+      tc_type: tcType,
+      tc_seconds: tcType === "none" ? 0 : (row.tc_seconds ?? 0),
+      sente_time_ms: tcType === "total" ? (row.sente_time_ms ?? null) : null,
+      gote_time_ms: tcType === "total" ? (row.gote_time_ms ?? null) : null,
+      turn_deadline:
+        !gameOver && typeof row.turn_deadline === "number"
+          ? new Date(row.turn_deadline).toISOString()
+          : null,
+      server_now: new Date().toISOString(),
+      sente_rank: row.sente_rank ?? null,
+      gote_rank: row.gote_rank ?? null,
+      sente_rank_visible: row.match_type === "matchmaking" && row.sente_rank_visible === 1,
+      gote_rank_visible: row.match_type === "matchmaking" && row.gote_rank_visible === 1,
+      sente_rating: row.sente_rating ?? null,
+      gote_rating: row.gote_rating ?? null,
+      sente_rating_delta: row.sente_rating_delta ?? null,
+      gote_rating_delta: row.gote_rating_delta ?? null,
+      sente_promoted: row.sente_promoted ?? null,
+      gote_promoted: row.gote_promoted ?? null,
+    };
+  }
+
+  private toDisconnectInfo(row: MatchRow, dc: DisconnectEval | null): DisconnectInfo {
+    if (row.game_over || !dc) return { side: null, deadline: null };
+    return { side: dc.disconnect_side, deadline: dc.disconnect_deadline };
+  }
+
+  // ---- broadcasting ------------------------------------------------------
+
+  private broadcastState(row: MatchRow, dc: DisconnectEval | null, exclude?: WebSocket): void {
+    const full = this.buildPayload(row, dc);
+    const bySide = { sente: redactRatings(full, SENTE), gote: redactRatings(full, GOTE) };
+    const disconnect = this.toDisconnectInfo(row, dc);
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === exclude) continue;
+      const att = ws.deserializeAttachment() as WsAttachment | null;
+      if (!att) continue;
+      const msg: ServerWsMessage = { type: "state", match: bySide[att.side], disconnect, yourSide: att.side };
+      try {
+        ws.send(JSON.stringify(msg));
+      } catch {
+        try {
+          ws.close(1011, "send_failed");
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  // ---- alarm scheduling ----------------------------------------------------
+
+  private scheduleAlarm(row: MatchRow, nowMs: number, exclude?: WebSocket): void {
+    let next = row.expires_at;
+    if (this.bothSeated(row) && !row.game_over) {
+      next = Math.min(next, nowMs + ACTIVE_TICK_MS);
+      // Flag fall, once the grace is over (a past time makes the alarm fire immediately).
+      if (typeof row.turn_deadline === "number") {
+        next = Math.min(next, row.turn_deadline + FLAG_GRACE_MS);
+      }
+      for (const side of [SENTE, GOTE] as const) {
+        if (this.sideConnected(side, nowMs, exclude)) continue;
+        const ls = this.effectiveLastSeen(row, side, exclude);
+        if (ls === null) continue;
+        const show = ls + DISCONNECT_SHOW_AFTER_MS;
+        const drop = ls + DISCONNECT_GRACE_MS;
+        if (show > nowMs) next = Math.min(next, show);
+        if (drop > nowMs) next = Math.min(next, drop);
+      }
+    }
+    void this.ctx.storage.setAlarm(next);
+  }
+
+  // ---- rating ------------------------------------------------------------
+
+  /**
+   * 終局が確定した直後に必ず1回だけ通る道。**実力値を動かすのはここだけ**。
+   * 終局の書き込み自体は詰み・投了・時間切れ・切断負けの4か所に分かれたままだが、
+   * どれも「UPDATE → loadRow → ここ → broadcastState」の順で通す決まりにしてある。
+   * 終局のパスを増やすときは、broadcast の前にここを呼ぶこと。
+   *
+   * 🔴 実力値が付かなくても対局結果は必ず配る。D1 の失敗をここで投げると、
+   *    勝敗そのものが相手に届かなくなる（例外は飲んで、変動なしで先へ進める）。
+   */
+  private async finalizeGameOver(row: MatchRow, nowMs: number): Promise<MatchRow> {
+    if (!row.game_over) return row;
+    // 友達対戦は実力値対象外
+    if (row.match_type !== "matchmaking") return row;
+    // delta が入っている = 反映ずみ（alarm の再実行で二度払いしない）
+    if (row.sente_rating_delta !== null) return row;
+    const senteUid = row.sente_uid;
+    const goteUid = row.gote_uid;
+    if (!senteUid || !goteUid) return row;
+    const senteScore = senteScoreFrom(row.winner);
+    if (senteScore === null) return row;
+
+    try {
+      const applied = await applyMatchRating(this.env.DB, {
+        roomCode: row.room_code,
+        senteUid,
+        goteUid,
+        senteScore,
+        nowMs,
+      });
+      if (!applied) return row;
+      this.ctx.storage.sql.exec(
+        `UPDATE match SET
+           sente_rank = ?, gote_rank = ?,
+           sente_rating = ?, gote_rating = ?,
+           sente_rating_delta = ?, gote_rating_delta = ?,
+           sente_promoted = ?, gote_promoted = ?
+         WHERE id = 1`,
+        applied.sente.bestRank,
+        applied.gote.bestRank,
+        applied.sente.display,
+        applied.gote.display,
+        applied.sente.displayDelta,
+        applied.gote.displayDelta,
+        applied.sente.promotedTo,
+        applied.gote.promotedTo,
+      );
+      return this.loadRow() ?? row;
+    } catch {
+      // D1 が落ちている / 同じ room_code で既に反映されている（DO の再起動後など）。
+      // どちらも「変動を出さないだけ」で対局結果は通常どおり配る
+      return row;
+    }
+  }
+
+  private async finalizeDisconnect(
+    _row: MatchRow,
+    dc: DisconnectEval,
+    nowMs: number,
+  ): Promise<MatchRow> {
+    const deadlineMs = dc.disconnect_deadline ? Date.parse(dc.disconnect_deadline) : null;
+    this.ctx.storage.sql.exec(
+      `UPDATE match SET game_over = 1, winner = ?, result_reason = ?, ended_at = COALESCE(ended_at, ?),
+         disconnect_side = ?, disconnect_deadline = ?,
+         turn_started_at = NULL, turn_deadline = NULL, revision = revision + 1
+       WHERE id = 1`,
+      dc.winner,
+      dc.resultReason,
+      nowMs,
+      dc.disconnect_side,
+      Number.isFinite(deadlineMs as number) ? deadlineMs : null,
+    );
+    const updated = await this.finalizeGameOver(this.loadRow()!, nowMs);
+    this.broadcastState(updated, null);
+    this.scheduleAlarm(updated, nowMs);
+    return updated;
+  }
+
+  // ---- time control ------------------------------------------------------
+
+  // The flag falls FLAG_GRACE_MS after the deadline the clients count down to.
+  private isTimedOut(row: MatchRow, nowMs: number): boolean {
+    return (
+      this.bothSeated(row) &&
+      !row.game_over &&
+      typeof row.turn_deadline === "number" &&
+      nowMs >= row.turn_deadline + FLAG_GRACE_MS
+    );
+  }
+
+  // The side to move ran out of time: they lose. Mirrors finalizeDisconnect.
+  private async finalizeTimeout(row: MatchRow, nowMs: number): Promise<MatchRow> {
+    const state = JSON.parse(row.state) as GameState;
+    const loser: Player = state.currentPlayer === GOTE ? GOTE : SENTE;
+    const winner: Player = loser === SENTE ? GOTE : SENTE;
+    const zeroLoserClock =
+      this.tcType(row) === "total"
+        ? `, ${loser === SENTE ? "sente_time_ms" : "gote_time_ms"} = 0`
+        : "";
+    this.ctx.storage.sql.exec(
+      `UPDATE match SET game_over = 1, winner = ?, result_reason = 'timeout', ended_at = COALESCE(ended_at, ?),
+         disconnect_side = NULL, disconnect_deadline = NULL,
+         turn_started_at = NULL, turn_deadline = NULL${zeroLoserClock},
+         revision = revision + 1
+       WHERE id = 1`,
+      winner,
+      nowMs,
+    );
+    const updated = await this.finalizeGameOver(this.loadRow()!, nowMs);
+    this.broadcastState(updated, null);
+    this.scheduleAlarm(updated, nowMs);
+    return updated;
+  }
+
+  // Called once when the second player joins: arm the first mover's clock.
+  private initializeClocks(nowMs: number): void {
+    const row = this.loadRow();
+    if (!row) return;
+    const tcType = this.tcType(row);
+    if (tcType === "none") return;
+    const allowanceMs = (row.tc_seconds ?? 0) * 1000;
+    const startAt = nowMs + MATCH_START_BUFFER_MS;
+    if (tcType === "total") {
+      this.ctx.storage.sql.exec(
+        `UPDATE match SET sente_time_ms = ?, gote_time_ms = ?,
+           turn_started_at = ?, turn_deadline = ? WHERE id = 1`,
+        allowanceMs,
+        allowanceMs,
+        startAt,
+        startAt + allowanceMs,
+      );
+    } else {
+      this.ctx.storage.sql.exec(
+        `UPDATE match SET turn_started_at = ?, turn_deadline = ? WHERE id = 1`,
+        startAt,
+        startAt + allowanceMs,
+      );
+    }
+  }
+
+  // ---- RPC: room lifecycle -------------------------------------------------
+
+  private resolveSidePref(pref: SidePref): Player {
+    if (pref === "random") {
+      return (crypto.getRandomValues(new Uint8Array(1))[0] & 1) === 1 ? SENTE : GOTE;
+    }
+    return pref === "gote" ? GOTE : SENTE;
+  }
+
+  async createRoom(params: {
+    roomCode: string;
+    uid: string;
+    displayName: string | null;
+    sidePref: SidePref;
+    tcType: TimeControlType;
+    tcSeconds: number;
+    matchType?: MatchType; // default "invite": every pre-existing caller is the invite flow
+    // 到達最高の段級位。Matchmaker が D1 から引いて渡す（友達対戦では渡さない）。
+    // 入室時に固めるので、対局中に相手のバッジが動くことはない。
+    bestRank?: number | null;
+  }): Promise<RoomResult> {
+    const now = Date.now();
+    this.ensureSchema();
+    if (this.loadRow()) {
+      return { ok: false, error: err("room_exists", "Room already exists") };
+    }
+    const resolved = this.resolveSidePref(params.sidePref);
+    const initialState = createInitialGameState();
+    this.ctx.storage.sql.exec(
+      `INSERT INTO match (
+         id, room_code, created_at, expires_at,
+         sente_uid, gote_uid, sente_name, gote_name,
+         state, revision, game_over, winner, result_reason,
+         disconnect_side, disconnect_deadline, last_seen_sente, last_seen_gote,
+         side_pref, tc_type, tc_seconds, match_type
+       ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?)`,
+      params.roomCode,
+      now,
+      now + ROOM_TTL_MS,
+      resolved === SENTE ? params.uid : "",
+      resolved === GOTE ? params.uid : null,
+      resolved === SENTE ? params.displayName : null,
+      resolved === GOTE ? params.displayName : null,
+      JSON.stringify(initialState),
+      resolved === SENTE ? now : null,
+      resolved === GOTE ? now : null,
+      params.sidePref,
+      params.tcType === "none" ? null : params.tcType,
+      params.tcType === "none" ? null : params.tcSeconds,
+      params.matchType === "matchmaking" ? "matchmaking" : "invite",
+    );
+    this.storeRank(resolved, params.bestRank);
+    const row = this.loadRow()!;
+    this.scheduleAlarm(row, now);
+    return {
+      ok: true,
+      match: this.toPayload(row, null, resolved),
+      yourSide: resolved,
+      disconnect: { side: null, deadline: null },
+    };
+  }
+
+  private storeRank(side: Player, bestRank: number | null | undefined): void {
+    if (typeof bestRank !== "number" || !Number.isInteger(bestRank)) return;
+    const col = side === SENTE ? "sente_rank" : "gote_rank";
+    const visibleCol = side === SENTE ? "sente_rank_visible" : "gote_rank_visible";
+    this.ctx.storage.sql.exec(`UPDATE match SET ${col} = ?, ${visibleCol} = 1 WHERE id = 1`, bestRank);
+  }
+
+  async join(params: {
+    uid: string;
+    displayName: string | null;
+    bestRank?: number | null;
+  }): Promise<RoomResult> {
+    const now = Date.now();
+    const row = this.activeRow(now);
+    if (!row) {
+      return { ok: false, error: err("not_found", "Room not found (or expired)") };
+    }
+
+    const isSente = Boolean(row.sente_uid) && row.sente_uid === params.uid;
+    const isGote = Boolean(row.gote_uid) && row.gote_uid === params.uid;
+    // The creator may occupy either seat; the joiner takes whichever is empty.
+    const emptySeat: Player | null = !row.sente_uid ? SENTE : !row.gote_uid ? GOTE : null;
+    const assigningSeat: Player | null = !isSente && !isGote ? emptySeat : null;
+
+    if (row.game_over && !isSente && !isGote) {
+      return { ok: false, error: err("game_over", "This match has already ended") };
+    }
+    if (!isSente && !isGote && emptySeat === null) {
+      return { ok: false, error: err("room_full", "This room is already full") };
+    }
+
+    if (assigningSeat !== null) {
+      const uidCol = assigningSeat === SENTE ? "sente_uid" : "gote_uid";
+      const nameCol = assigningSeat === SENTE ? "sente_name" : "gote_name";
+      this.ctx.storage.sql.exec(
+        `UPDATE match SET ${uidCol} = ?, ${nameCol} = ?, last_seen_sente = ?, last_seen_gote = ?,
+           started_at = COALESCE(started_at, ?)
+         WHERE id = 1`,
+        params.uid,
+        params.displayName,
+        now,
+        now,
+        now,
+      );
+      this.storeRank(assigningSeat, params.bestRank);
+      // Both seats are now occupied: the match starts and clocks arm.
+      this.initializeClocks(now);
+    } else if (isSente && params.displayName && !row.sente_name) {
+      this.ctx.storage.sql.exec(
+        "UPDATE match SET sente_name = ? WHERE id = 1",
+        params.displayName,
+      );
+    } else if (isGote && params.displayName && !row.gote_name) {
+      this.ctx.storage.sql.exec(
+        "UPDATE match SET gote_name = ? WHERE id = 1",
+        params.displayName,
+      );
+    }
+
+    const mySide: Player = isSente ? SENTE : isGote ? GOTE : assigningSeat!;
+    this.touch(mySide, now);
+
+    const updated = this.loadRow()!;
+    const dc = updated.game_over ? null : this.evaluate(updated, now);
+
+    if (assigningSeat !== null) {
+      // The match just started, so tell the waiting creator immediately.
+      this.broadcastState(updated, dc);
+    }
+    this.scheduleAlarm(updated, now);
+
+    return {
+      ok: true,
+      match: this.toPayload(updated, dc, mySide),
+      yourSide: mySide,
+      disconnect: this.toDisconnectInfo(updated, dc),
+    };
+  }
+
+  // Pre-join settings edit by the creator. Once the opponent joins, settings
+  // are locked (match_started). A seat change invalidates the caller's token
+  // side and every WS attachment/hibernation tag, so all room sockets are
+  // force-closed (4001) and the Worker re-signs a token for the new seat.
+  async updateSettings(params: {
+    uid: string;
+    sidePref: SidePref;
+    tcType: TimeControlType;
+    tcSeconds: number;
+  }): Promise<RoomResult> {
+    const now = Date.now();
+    const row = this.activeRow(now);
+    if (!row) {
+      return { ok: false, error: err("not_found", "Room not found (or expired)") };
+    }
+    if (row.game_over) {
+      return { ok: false, error: err("game_over", "This match has already ended") };
+    }
+    if (this.bothSeated(row)) {
+      return {
+        ok: false,
+        error: err("match_started", "Opponent already joined; settings are locked"),
+      };
+    }
+    const isSente = Boolean(row.sente_uid) && row.sente_uid === params.uid;
+    const isGote = Boolean(row.gote_uid) && row.gote_uid === params.uid;
+    if (!isSente && !isGote) {
+      return { ok: false, error: err("forbidden", "You are not a participant of this room") };
+    }
+
+    const currentSeat: Player = isSente ? SENTE : GOTE;
+    const resolved = this.resolveSidePref(params.sidePref);
+    const seatChanged = resolved !== currentSeat;
+
+    if (seatChanged) {
+      if (resolved === SENTE) {
+        this.ctx.storage.sql.exec(
+          `UPDATE match SET sente_uid = ?, sente_name = ?, last_seen_sente = ?,
+             gote_uid = NULL, gote_name = NULL, last_seen_gote = NULL WHERE id = 1`,
+          params.uid,
+          row.gote_name,
+          now,
+        );
+      } else {
+        this.ctx.storage.sql.exec(
+          `UPDATE match SET gote_uid = ?, gote_name = ?, last_seen_gote = ?,
+             sente_uid = '', sente_name = NULL, last_seen_sente = NULL WHERE id = 1`,
+          params.uid,
+          row.sente_name,
+          now,
+        );
+      }
+      for (const ws of this.ctx.getWebSockets()) {
+        try {
+          ws.close(4001, "seat_changed");
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    this.ctx.storage.sql.exec(
+      `UPDATE match SET side_pref = ?, tc_type = ?, tc_seconds = ? WHERE id = 1`,
+      params.sidePref,
+      params.tcType === "none" ? null : params.tcType,
+      params.tcType === "none" ? null : params.tcSeconds,
+    );
+
+    const updated = this.loadRow()!;
+    const dc = this.evaluate(updated, now); // pre-start: never ends the game
+    if (!seatChanged) {
+      // Seats (and thus attachments) are intact; sync any other open tab.
+      this.broadcastState(updated, dc);
+    }
+    this.scheduleAlarm(updated, now);
+    return {
+      ok: true,
+      match: this.toPayload(updated, dc, resolved),
+      yourSide: resolved,
+      disconnect: this.toDisconnectInfo(updated, dc),
+    };
+  }
+
+  async getStateFor(params: { side: Player; uid: string }): Promise<RoomResult> {
+    const now = Date.now();
+    const row = this.activeRow(now);
+    if (!row) {
+      return { ok: false, error: err("not_found", "Room not found (or expired)") };
+    }
+    if (!this.uidMatchesSeat(row, params.side, params.uid)) {
+      return { ok: false, error: err("forbidden", "You are not a participant of this room") };
+    }
+
+    if (row.game_over) {
+      return {
+        ok: true,
+        match: this.toPayload(row, null, params.side),
+        yourSide: params.side,
+        disconnect: { side: null, deadline: null },
+      };
+    }
+
+    this.touch(params.side, now);
+    const touched = this.loadRow()!;
+
+    if (this.isTimedOut(touched, now)) {
+      const finalized = await this.finalizeTimeout(touched, now);
+      return {
+        ok: true,
+        match: this.toPayload(finalized, null, params.side),
+        yourSide: params.side,
+        disconnect: { side: null, deadline: null },
+      };
+    }
+
+    const dc = this.evaluate(touched, now);
+
+    if (dc.gameOver) {
+      const finalized = await this.finalizeDisconnect(touched, dc, now);
+      return {
+        ok: true,
+        match: this.toPayload(finalized, null, params.side),
+        yourSide: params.side,
+        disconnect: { side: null, deadline: null },
+      };
+    }
+
+    this.scheduleAlarm(touched, now);
+    return {
+      ok: true,
+      match: this.toPayload(touched, dc, params.side),
+      yourSide: params.side,
+      disconnect: this.toDisconnectInfo(touched, dc),
+    };
+  }
+
+  private uidMatchesSeat(row: MatchRow, side: Player, uid: string): boolean {
+    if (!uid) return false; // a vacant sente seat is "", never a valid uid
+    if (side === SENTE) return row.sente_uid === uid;
+    return row.gote_uid !== null && row.gote_uid === uid;
+  }
+
+  // ---- RPC: gameplay -------------------------------------------------------
+
+  async submitMove(params: {
+    side: Player;
+    uid: string;
+    expectedRevision: number;
+    move: Move;
+  }): Promise<MoveResult> {
+    const now = Date.now();
+    const row = this.activeRow(now);
+    if (!row) return { ok: false, error: err("not_found", "Room not found (or expired)") };
+    if (!this.uidMatchesSeat(row, params.side, params.uid)) {
+      return { ok: false, error: err("forbidden", "You are not a participant of this room") };
+    }
+    return this.handleMove(params.side, params.expectedRevision, params.move, now);
+  }
+
+  async resign(params: {
+    side: Player;
+    uid: string;
+    expectedRevision: number | null;
+  }): Promise<MoveResult> {
+    const now = Date.now();
+    const row = this.activeRow(now);
+    if (!row) return { ok: false, error: err("not_found", "Room not found (or expired)") };
+    if (!this.uidMatchesSeat(row, params.side, params.uid)) {
+      return { ok: false, error: err("forbidden", "You are not a participant of this room") };
+    }
+    return this.handleResign(params.side, params.expectedRevision, now);
+  }
+
+  private async handleMove(
+    side: Player,
+    expectedRevision: number,
+    move: Move,
+    now: number,
+    exclude?: WebSocket,
+  ): Promise<MoveResult> {
+    const row = this.activeRow(now);
+    if (!row) return { ok: false, error: err("not_found", "Room not found (or expired)") };
+
+    if (!this.bothSeated(row)) {
+      return { ok: false, error: err("not_started", "Opponent has not joined yet") };
+    }
+    if (row.game_over) {
+      // Keep retries idempotent by returning the authoritative final state.
+      return { ok: true, match: this.toPayload(row, null, side) };
+    }
+
+    this.touch(side, now);
+    const touched = this.loadRow()!;
+
+    // Flag-fall check before accepting the move.
+    if (this.isTimedOut(touched, now)) {
+      const finalized = await this.finalizeTimeout(touched, now);
+      return { ok: true, match: this.toPayload(finalized, null, side) };
+    }
+
+    // Disconnect timeout check before accepting the move.
+    const dc = this.evaluate(touched, now);
+    if (dc.gameOver) {
+      const finalized = await this.finalizeDisconnect(touched, dc, now);
+      return { ok: true, match: this.toPayload(finalized, null, side) };
+    }
+
+    if (touched.revision !== expectedRevision) {
+      return {
+        ok: false,
+        error: err("revision_conflict", "Revision mismatch"),
+        match: this.toPayload(touched, dc, side),
+      };
+    }
+
+    const state = JSON.parse(touched.state) as GameState;
+    if (!state || (state.currentPlayer !== SENTE && state.currentPlayer !== GOTE)) {
+      return { ok: false, error: err("bad_state", "Corrupted match state") };
+    }
+    if (state.currentPlayer !== side) {
+      return {
+        ok: false,
+        error: err("not_your_turn", "It is not your turn"),
+        match: this.toPayload(touched, dc, side),
+      };
+    }
+
+    let applied;
+    try {
+      applied = applyMove(state, move);
+    } catch (e) {
+      return {
+        ok: false,
+        error: err("illegal_move", `Move rejected by server: ${String(e)}`),
+        match: this.toPayload(touched, dc, side),
+      };
+    }
+
+    // Clock bookkeeping: the mover pays elapsed time (total mode) and the
+    // opponent's countdown starts — unless this move ended the game.
+    const tcType = this.tcType(touched);
+    let clockSql = "";
+    const clockParams: number[] = [];
+    if (tcType === "per_move") {
+      if (applied.gameOver) {
+        clockSql = ", turn_started_at = NULL, turn_deadline = NULL";
+      } else {
+        clockSql = ", turn_started_at = ?, turn_deadline = ?";
+        clockParams.push(now, now + (touched.tc_seconds ?? 0) * 1000);
+      }
+    } else if (tcType === "total") {
+      // turn_started_at may sit in the future (start buffer) -> clamp to 0.
+      const elapsed = Math.max(0, now - (touched.turn_started_at ?? now));
+      const moverCol = side === SENTE ? "sente_time_ms" : "gote_time_ms";
+      const moverPrev =
+        (side === SENTE ? touched.sente_time_ms : touched.gote_time_ms) ?? 0;
+      const moverRemain = Math.max(0, moverPrev - elapsed);
+      const opponentRemain =
+        (side === SENTE ? touched.gote_time_ms : touched.sente_time_ms) ?? 0;
+      if (applied.gameOver) {
+        clockSql = `, ${moverCol} = ?, turn_started_at = NULL, turn_deadline = NULL`;
+        clockParams.push(moverRemain);
+      } else {
+        clockSql = `, ${moverCol} = ?, turn_started_at = ?, turn_deadline = ?`;
+        clockParams.push(moverRemain, now, now + opponentRemain);
+      }
+    }
+
+    if (applied.gameOver) {
+      this.ctx.storage.sql.exec(
+        `UPDATE match SET state = ?, revision = revision + 1,
+           game_over = 1, winner = ?, result_reason = ?, ended_at = COALESCE(ended_at, ?),
+           disconnect_side = NULL, disconnect_deadline = NULL${clockSql}
+         WHERE id = 1`,
+        JSON.stringify(applied.state),
+        applied.winner,
+        applied.resultReason,
+        now,
+        ...clockParams,
+      );
+    } else {
+      this.ctx.storage.sql.exec(
+        `UPDATE match SET state = ?, revision = revision + 1,
+           disconnect_side = NULL, disconnect_deadline = NULL${clockSql}
+         WHERE id = 1`,
+        JSON.stringify(applied.state),
+        ...clockParams,
+      );
+    }
+
+    const updated = await this.finalizeGameOver(this.loadRow()!, now);
+    const updatedDc = updated.game_over ? null : this.evaluate(updated, now);
+    this.broadcastState(updated, updatedDc, exclude);
+    this.scheduleAlarm(updated, now);
+    return { ok: true, match: this.toPayload(updated, updatedDc, side) };
+  }
+
+  private async handleResign(
+    side: Player,
+    expectedRevision: number | null,
+    now: number,
+    exclude?: WebSocket,
+  ): Promise<MoveResult> {
+    const row = this.activeRow(now);
+    if (!row) return { ok: false, error: err("not_found", "Room not found (or expired)") };
+
+    if (row.game_over) {
+      return { ok: true, match: this.toPayload(row, null, side) };
+    }
+    if (expectedRevision !== null && row.revision !== expectedRevision) {
+      return {
+        ok: false,
+        error: err("revision_conflict", "Revision mismatch"),
+        match: this.toPayload(row, row.game_over ? null : this.evaluate(row, now), side),
+      };
+    }
+
+    const winner = side === SENTE ? GOTE : SENTE;
+    this.ctx.storage.sql.exec(
+      `UPDATE match SET game_over = 1, winner = ?, result_reason = 'resign', ended_at = COALESCE(ended_at, ?),
+         disconnect_side = NULL, disconnect_deadline = NULL,
+         turn_started_at = NULL, turn_deadline = NULL, revision = revision + 1
+       WHERE id = 1`,
+      winner,
+      now,
+    );
+
+    const updated = await this.finalizeGameOver(this.loadRow()!, now);
+    this.broadcastState(updated, null, exclude);
+    this.scheduleAlarm(updated, now);
+    return { ok: true, match: this.toPayload(updated, null, side) };
+  }
+
+  // ---- WebSocket (Hibernation API) ------------------------------------------
+
+  // The Worker verifies the player token and forwards the upgrade request with
+  // x-match-side / x-match-uid headers.
+  async fetch(request: Request): Promise<Response> {
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+      return Response.json(
+        { ok: false, error: err("bad_request", "Expected WebSocket upgrade") },
+        { status: 400 },
+      );
+    }
+    const side = request.headers.get("x-match-side") as Player | null;
+    const uid = request.headers.get("x-match-uid");
+    if ((side !== SENTE && side !== GOTE) || !uid) {
+      return Response.json(
+        { ok: false, error: err("unauthorized", "Missing player identity") },
+        { status: 401 },
+      );
+    }
+
+    const now = Date.now();
+    const row = this.activeRow(now);
+    if (!row) {
+      return Response.json(
+        { ok: false, error: err("not_found", "Room not found (or expired)") },
+        { status: 404 },
+      );
+    }
+    if (!this.uidMatchesSeat(row, side, uid)) {
+      return Response.json(
+        { ok: false, error: err("forbidden", "You are not a participant of this room") },
+        { status: 403 },
+      );
+    }
+
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+    this.ctx.acceptWebSocket(server, [side]);
+    const attachment: WsAttachment = { side, uid, openedAt: now };
+    server.serializeAttachment(attachment);
+
+    if (!row.game_over) this.touch(side, now);
+    let fresh = this.loadRow()!;
+    if (this.isTimedOut(fresh, now)) {
+      fresh = await this.finalizeTimeout(fresh, now);
+    }
+    const dc = fresh.game_over ? null : this.evaluate(fresh, now);
+
+    // Initial state to the new socket…
+    const initial: ServerWsMessage = {
+      type: "state",
+      match: this.toPayload(fresh, dc, side),
+      disconnect: this.toDisconnectInfo(fresh, dc),
+      yourSide: side,
+    };
+    server.send(JSON.stringify(initial));
+    // …and let everyone else know (e.g. clears their disconnect countdown).
+    this.broadcastState(fresh, dc, server);
+    this.scheduleAlarm(fresh, now);
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (typeof message !== "string") return;
+    const att = ws.deserializeAttachment() as WsAttachment | null;
+    if (!att) return;
+
+    let data: { type?: string; reqId?: unknown; expectedRevision?: unknown; move?: unknown };
+    try {
+      data = JSON.parse(message);
+    } catch {
+      this.sendTo(ws, { type: "error", error: err("bad_json", "Invalid JSON message") });
+      return;
+    }
+
+    const now = Date.now();
+    const reqId = typeof data.reqId === "number" ? data.reqId : null;
+
+    if (data.type === "move") {
+      const expectedRevision =
+        typeof data.expectedRevision === "number" && Number.isInteger(data.expectedRevision)
+          ? data.expectedRevision
+          : null;
+      const move = data.move as Move | undefined;
+      if (reqId === null || expectedRevision === null || expectedRevision < 0 ||
+          !move || (move.type !== "move" && move.type !== "drop")) {
+        this.sendTo(ws, { type: "error", error: err("bad_move", "Invalid move payload") });
+        return;
+      }
+      const result = await this.handleMove(att.side, expectedRevision, move, now, ws);
+      this.sendTo(ws, { type: "ack", reqId, ...result });
+      return;
+    }
+
+    if (data.type === "resign") {
+      if (reqId === null) {
+        this.sendTo(ws, { type: "error", error: err("bad_request", "Missing reqId") });
+        return;
+      }
+      const expectedRevision =
+        typeof data.expectedRevision === "number" && Number.isInteger(data.expectedRevision)
+          ? data.expectedRevision
+          : null;
+      const result = await this.handleResign(att.side, expectedRevision, now, ws);
+      this.sendTo(ws, { type: "ack", reqId, ...result });
+      return;
+    }
+
+    this.sendTo(ws, { type: "error", error: err("bad_request", "Unknown message type") });
+  }
+
+  async webSocketClose(ws: WebSocket): Promise<void> {
+    this.noteSocketGone(ws);
+  }
+
+  async webSocketError(ws: WebSocket): Promise<void> {
+    this.noteSocketGone(ws);
+  }
+
+  private noteSocketGone(ws: WebSocket): void {
+    const att = ws.deserializeAttachment() as WsAttachment | null;
+    if (!att) return;
+    const now = Date.now();
+    const row = this.loadRow();
+    if (!row || now >= row.expires_at || row.game_over) return;
+    // Freeze last_seen at the disconnect moment; the alarm chain takes it from
+    // here (countdown push at +15s, forfeit at +60s — same rules as before).
+    this.touch(att.side, now);
+    const touched = this.loadRow()!;
+    this.scheduleAlarm(touched, now, ws);
+  }
+
+  private sendTo(ws: WebSocket, msg: ServerWsMessage): void {
+    try {
+      ws.send(JSON.stringify(msg));
+    } catch {
+      // ignore — close handling will pick this socket up
+    }
+  }
+
+  // ---- alarm -----------------------------------------------------------------
+
+  async alarm(): Promise<void> {
+    const row = this.loadRow();
+    if (!row) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+
+    const now = Date.now();
+
+    // 24h expiry: notify clients, close sockets, and wipe all room storage.
+    if (now >= row.expires_at) {
+      for (const ws of this.ctx.getWebSockets()) {
+        try {
+          ws.send(JSON.stringify({ type: "expired" } satisfies ServerWsMessage));
+          ws.close(1000, "room_expired");
+        } catch {
+          // ignore
+        }
+      }
+      await this.ctx.storage.deleteAlarm();
+      await this.ctx.storage.deleteAll();
+      return;
+    }
+
+    if (this.bothSeated(row) && !row.game_over) {
+      // Flag fall first: the turn deadline is exact while disconnect grace
+      // is fuzzy, so a simultaneous alarm resolves deterministically.
+      if (this.isTimedOut(row, now)) {
+        await this.finalizeTimeout(row, now);
+        return;
+      }
+      const dc = this.evaluate(row, now);
+      if (dc.gameOver) {
+        await this.finalizeDisconnect(row, dc, now);
+        return;
+      }
+      // Periodic authoritative re-sync + disconnect countdown updates.
+      this.broadcastState(row, dc);
+      this.scheduleAlarm(row, now);
+      return;
+    }
+
+    this.scheduleAlarm(row, now);
+  }
+}

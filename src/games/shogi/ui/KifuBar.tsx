@@ -40,7 +40,8 @@ export function KifuBar({
   view: GameView
   open: boolean
   onToggle: () => void
-  onJump: (cursor: number) => void
+  /** Jump to a move; omitted where the board must stay on the live position (online). */
+  onJump?: (cursor: number) => void
   turnLabel: string
 }) {
   // Notation is rebuilt only for moves not seen before (buildNotation reuses the prefix).
@@ -97,17 +98,26 @@ export function KifuBar({
             <p className="kifu-empty">まだ指し手がありません</p>
           ) : (
             <ol className="kifu-list" ref={listRef}>
-              <li>
-                <button type="button" aria-current={view.cursor === 0} onClick={() => onJump(0)}>
-                  開始局面
-                </button>
-              </li>
+              {onJump && (
+                <li>
+                  <button type="button" aria-current={view.cursor === 0} onClick={() => onJump(0)}>
+                    開始局面
+                  </button>
+                </li>
+              )}
               {entries.map((e) => (
                 <li key={e.ply}>
-                  <button type="button" aria-current={view.cursor === e.ply} onClick={() => onJump(e.ply)}>
-                    <span className="kifu-ply">{e.ply}</span>
-                    {e.text}
-                  </button>
+                  {onJump ? (
+                    <button type="button" aria-current={view.cursor === e.ply} onClick={() => onJump(e.ply)}>
+                      <span className="kifu-ply">{e.ply}</span>
+                      {e.text}
+                    </button>
+                  ) : (
+                    <span className="kifu-entry" aria-current={view.cursor === e.ply}>
+                      <span className="kifu-ply">{e.ply}</span>
+                      {e.text}
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>

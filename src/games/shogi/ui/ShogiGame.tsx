@@ -10,45 +10,26 @@ import {
   resolvePlayableLevel,
 } from '../ai/levels'
 import type { AiLevelId } from '../ai/types'
-import { findKing, getOpponent } from '../core/engine'
-import type { BasePieceType, Move, Player } from '../core/engine'
-import {
-  canPromote,
-  checkingPieces,
-  explainNoDrops,
-  explainNoMoves,
-  explainRejectedDrop,
-  explainRejectedMove,
-  legalDrops,
-  legalTargets,
-  movablePieces,
-  mustPromote,
-} from '../core/hints'
-import type { Refusal, Square } from '../core/hints'
+import { getOpponent } from '../core/engine'
+import type { Move, Player } from '../core/engine'
 import { parseUsiMove } from '../core/kifu/moves'
 import { decodeKifuParam } from '../core/kifu/url'
 import { atEnd, currentState, openRecord, play, resign, seek, visibleOutcome } from '../core/record'
 import type { GameView } from '../core/record'
 import { readJson, writeJson } from '../../../site/storage'
-import { Board } from './Board'
 import type { MoveAnimation } from './Board'
 import { playMoveSound, unlockAudio, vibrate } from './feedback'
 import { FirstMoveDemo } from './FirstMoveDemo'
-import { Hand } from './Hand'
+import { GameBoard } from './GameBoard'
 import { KifuBar } from './KifuBar'
 import { LevelPicker } from './LevelPicker'
-import { refusalText } from './messages'
-import { Piece } from './Piece'
-import { PromoteSheet } from './PromoteSheet'
 import { ResultDialog } from './ResultDialog'
 import { SettingsDialog } from './SettingsDialog'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './settings'
 import type { ShogiSettings } from './settings'
 import { positionKey, useAiOpponent } from './useAiOpponent'
-import { usePieceDrag } from './usePieceDrag'
+import { useBoardInput } from './useBoardInput'
 import { EMPTY_RECORD, useShogiGame } from './useShogiGame'
-
-type Selection = { kind: 'board'; square: Square } | { kind: 'hand'; type: BasePieceType }
 
 interface Progress {
   /** Levels the player has beaten at least once (unlocks the next legendary level). */
@@ -83,7 +64,6 @@ const DEMO_DEAD_TAP_MS = 500
 /** Two loops of the CSS animation (3.2 s each). */
 const DEMO_SHOW_MS = 6400
 const DEMO_MAX_SHOWS = 2
-const HINT_MS = 4000
 const CHECK_MS = 2400
 const RESET_UNDO_MS = 10_000
 const RESET_UNDO_MIN_PLIES = 3
@@ -108,10 +88,6 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
   const progressRef = useRef(progress)
   const gameId = useRef<string>('')
   const [level, setLevel] = useState<AiLevelId>(DEFAULT_AI_LEVEL)
-  const [selection, setSelection] = useState<Selection | null>(null)
-  const [promotion, setPromotion] = useState<{ from: Square; to: Square } | null>(null)
-  const [hint, setHint] = useState<{ text: string; cells: Square[]; id: number } | null>(null)
-  const [shake, setShake] = useState<{ square: Square; id: number } | null>(null)
   const [notice, setNotice] = useState<Flash | null>(null)
   const [checkLineVisible, setCheckLineVisible] = useState(false)
   const [resetUndo, setResetUndo] = useState<ResetUndo | null>(null)
@@ -173,7 +149,6 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     }
     update(() => opened)
     setReview({ plies: opened.record.moves.length })
-    setSelection(null)
     setDialog(null)
     setKifuOpen(true)
   }, [restored, shared, sharedHandled, update, flash])
@@ -208,6 +183,19 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
 
   // In a shared kifu either side may move: the first move starts a game from there.
   const interactive = restored && !outcome && !ai.thinking && (review !== null || state.currentPlayer === humanSide)
+
+  const input = useBoardInput({
+    state,
+    interactive,
+    moveHints: settings.moveHints,
+    onMove: (move) => commitMove(move, 'human'),
+    onBlockedTap: () => {
+      if (restored && !outcome && !atEnd(view) && state.currentPlayer !== humanSide) {
+        flash('相手の手番の局面です。＜ ＞ で自分の手番まで動かすと指せます', 'info')
+      }
+    },
+    onDeadTap: () => showDemo('光っている駒をタップして動かせます', DEMO_DEAD_TAP_MS),
+  })
 
   // ------------------------------------------------------------ first-move demo
   const demoEligible =
@@ -275,12 +263,6 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
   }, [notice])
 
   useEffect(() => {
-    if (!hint) return
-    const t = setTimeout(() => setHint(null), HINT_MS)
-    return () => clearTimeout(t)
-  }, [hint])
-
-  useEffect(() => {
     if (!resetUndo) return
     const t = setTimeout(() => setResetUndo(null), RESET_UNDO_MS)
     return () => clearTimeout(t)
@@ -292,19 +274,11 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     return () => clearTimeout(t)
   }, [checkLineVisible])
 
-  function refuse(refusal: Refusal, moving: Parameters<typeof refusalText>[2], at: Square | null) {
-    if (at) setShake({ square: at, id: ++flashSeq })
-    if (!settings.moveHints) return
-    const text = refusalText(refusal, state.board, moving)
-    if (text) setHint({ text, cells: refusal.cells, id: ++flashSeq })
-  }
-
   /** Records wins and unlocks once, when a move or resignation ends the game. */
   function finish(next: GameView, me: Player = humanSide) {
     const result = visibleOutcome(next)
     if (!result) return
-    setSelection(null)
-    setPromotion(null)
+    input.clear()
     const current = progressRef.current
     if (result.winner === me && !current.counted.includes(gameId.current)) {
       const unlock = levelUnlockedByBeating(level)
@@ -360,9 +334,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
       return // illegal (should not happen: moves are validated before)
     }
     if (!applied) return
-    setSelection(null)
-    setPromotion(null)
-    setHint(null)
+    input.clear()
     if (by === 'human') {
       setResetUndo(null)
       setDemo(null)
@@ -381,101 +353,6 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     finish(next, me)
   }
 
-  // ------------------------------------------------------------ input
-  function trySelectBoard(square: Square): boolean {
-    const piece = state.board[square.y][square.x]
-    if (!piece || piece.owner !== state.currentPlayer) return false
-    if (legalTargets(state, square).length === 0) {
-      refuse(explainNoMoves(state, square), piece.type, square)
-      setSelection(null)
-      return true
-    }
-    setSelection({ kind: 'board', square })
-    setHint(null)
-    return true
-  }
-
-  function selectHand(type: BasePieceType) {
-    if (!interactive) return
-    if (selection?.kind === 'hand' && selection.type === type) {
-      setSelection(null)
-      return
-    }
-    if (legalDrops(state, type).length === 0) {
-      refuse(explainNoDrops(state), type, null)
-      return
-    }
-    setSelection({ kind: 'hand', type })
-    setHint(null)
-  }
-
-  function moveTo(source: Selection, target: Square) {
-    if (source.kind === 'hand') {
-      if (legalDrops(state, source.type).some((s) => s.x === target.x && s.y === target.y)) {
-        commitMove({ type: 'drop', pieceType: source.type, toX: target.x, toY: target.y }, 'human')
-      } else {
-        refuse(explainRejectedDrop(state, source.type, target), source.type, target)
-        setSelection(null)
-      }
-      return
-    }
-    const from = source.square
-    const piece = state.board[from.y][from.x]!
-    if (!legalTargets(state, from).some((s) => s.x === target.x && s.y === target.y)) {
-      refuse(explainRejectedMove(state, from, target), piece.type, target)
-      setSelection(null)
-      return
-    }
-    const base = { type: 'move' as const, fromX: from.x, fromY: from.y, toX: target.x, toY: target.y }
-    if (mustPromote(piece, target.y)) commitMove({ ...base, promote: true }, 'human')
-    else if (canPromote(piece, from.y, target.y)) setPromotion({ from, to: target })
-    else commitMove({ ...base, promote: false }, 'human')
-  }
-
-  function onSquare(square: Square) {
-    unlockAudio()
-    if (promotion) return
-    if (!interactive) {
-      if (restored && !outcome && !atEnd(view) && state.currentPlayer !== humanSide) {
-        flash('相手の手番の局面です。＜ ＞ で自分の手番まで動かすと指せます', 'info')
-      }
-      return
-    }
-    if (selection) {
-      const same = selection.kind === 'board' && selection.square.x === square.x && selection.square.y === square.y
-      if (same) {
-        setSelection(null)
-        return
-      }
-      const piece = state.board[square.y][square.x]
-      // Tapping another own piece switches the selection instead of refusing.
-      if (piece && piece.owner === state.currentPlayer && trySelectBoard(square)) return
-      moveTo(selection, square)
-      return
-    }
-    if (!trySelectBoard(square)) showDemo('光っている駒をタップして動かせます', DEMO_DEAD_TAP_MS)
-  }
-
-  const drag = usePieceDrag<Selection>({
-    onStart: (source) => {
-      if (!interactive) return false
-      if (source.kind === 'board') return trySelectBoard(source.square) && legalTargets(state, source.square).length > 0
-      if (legalDrops(state, source.type).length === 0) return false
-      setSelection(source)
-      return true
-    },
-    onDrop: (source, target) => {
-      if (!target) {
-        setSelection(null)
-        return
-      }
-      if (source.kind === 'board' && source.square.x === target.x && source.square.y === target.y) return
-      // The source comes from the drag itself: `selection` may not be committed yet.
-      moveTo(source, target)
-    },
-    onCancel: () => setSelection(null),
-  })
-
   // ------------------------------------------------------------ game control
   function newGame(options: { level?: AiLevelId; side?: Player } = {}) {
     const hasProgress = view.record.moves.length >= RESET_UNDO_MIN_PLIES && !view.outcome
@@ -492,9 +369,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     setStartedByButton(true)
     startGameId()
     ai.newGame()
-    setSelection(null)
-    setPromotion(null)
-    setHint(null)
+    input.clear()
     setDialog(null)
     setKifuOpen(false)
     setConfirmResign(false)
@@ -525,9 +400,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
 
   function goTo(cursor: number) {
     ai.cancel()
-    setSelection(null)
-    setPromotion(null)
-    setHint(null)
+    input.clear()
     update((v) => seek(v, cursor))
     if (dialog === 'result') setDialog(null)
   }
@@ -549,39 +422,12 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
   }, [])
 
   // ------------------------------------------------------------ derived view data
-  const movable = useMemo(() => (interactive && !selection ? movablePieces(state) : []), [interactive, selection, state])
-  const targets = useMemo(() => {
-    if (!selection || !interactive) return []
-    return selection.kind === 'board' ? legalTargets(state, selection.square) : legalDrops(state, selection.type)
-  }, [selection, interactive, state])
-
   const lastMove = useMemo(() => {
     const usi = view.cursor > 0 ? view.record.moves[view.cursor - 1] : null
     const move = usi ? parseUsiMove(usi) : null
     return move ? { x: move.toX, y: move.toY } : null
   }, [view])
 
-  const check = useMemo(() => {
-    if (!state.isCheck) return { cells: [] as Square[], line: null as { from: Square; to: Square } | null }
-    const king = findKing(state.currentPlayer, state.board)
-    const attackers = checkingPieces(state.currentPlayer, state.board)
-    const far = king ? attackers.find((a) => Math.max(Math.abs(a.x - king.x), Math.abs(a.y - king.y)) >= 2) : undefined
-    return {
-      cells: settings.moveHints ? [...attackers, ...(king ? [king] : [])] : [],
-      line: settings.moveHints && king && far ? { from: far, to: king } : null,
-    }
-  }, [state, settings.moveHints])
-
-  const promotionPiece = promotion ? state.board[promotion.from.y][promotion.from.x] : null
-  const promotionAt = promotion
-    ? flipped
-      ? { row: 8 - promotion.to.y, col: 8 - promotion.to.x }
-      : { row: promotion.to.y, col: promotion.to.x }
-    : null
-  const selectedHand = selection?.kind === 'hand' ? selection.type : null
-
-  const topSide = flipped ? 'sente' : 'gote'
-  const bottomSide = getOpponent(topSide)
   const sideLabel = (side: Player) => (review ? (side === 'sente' ? '先手' : '後手') : side === humanSide ? 'あなた' : 'AI')
   const levelInfo = getAiLevel(level)
 
@@ -620,92 +466,30 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
         </div>
       )}
 
-      <div className="board-area">
-        <Hand
-          owner={topSide}
-          label={sideLabel(topSide)}
-          pieces={state.capturedPieces[topSide]}
-          active={state.currentPlayer === topSide}
-          selected={topSide === humanSide ? selectedHand : null}
-          droppable={interactive && topSide === humanSide}
-          pieceStyle={settings.pieceStyle}
-          onSelect={selectHand}
-          onPiecePointerDown={(type, e) => drag.arm({ kind: 'hand', type }, e)}
-        />
-        <div className="board-stage">
-          <Board
-            board={state.board}
-            flipped={flipped}
-            pieceStyle={settings.pieceStyle}
-            selected={selection?.kind === 'board' ? selection.square : null}
-            targets={targets}
-            movable={movable}
-            lastMove={lastMove}
-            checkCells={check.cells}
-            checkLine={checkLineVisible || dialog === 'result' ? check.line : null}
-            hintCells={hint?.cells ?? []}
-            shake={shake}
-            animation={animation}
-            interactive={interactive}
-            overlay={
-              demo && !promotion ? (
-                <FirstMoveDemo text={demo} />
-              ) : (
-              promotion && promotionPiece && promotionAt && (
-              <PromoteSheet
-                type={promotionPiece.type}
-                at={promotionAt}
-                pieceStyle={settings.pieceStyle}
-                onChoose={(promote) =>
-                  commitMove(
-                    { type: 'move', fromX: promotion.from.x, fromY: promotion.from.y, toX: promotion.to.x, toY: promotion.to.y, promote },
-                    'human',
-                  )
-                }
-                onCancel={() => {
-                  setPromotion(null)
-                  setSelection(null)
-                }}
-              />
-            ))
-            }
-            onSquare={onSquare}
-            onPiecePointerDown={(square, e) => drag.arm({ kind: 'board', square }, e)}
-          />
-          {ai.thinking && (
-            <div className={`thinking ${flipped ? 'thinking-bottom' : ''}`} role="status">
-              <span className="thinking-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-              考え中
-            </div>
-          )}
-          {hint && (
-            <div
-              className="move-hint"
-              style={{ top: `calc(16px + ${hintRow(hint.cells, flipped)} * var(--cell))` }}
-              role="status"
-              aria-live="polite"
-              key={hint.id}
-            >
-              {hint.text}
-            </div>
-          )}
-        </div>
-        <Hand
-          owner={bottomSide}
-          label={sideLabel(bottomSide)}
-          pieces={state.capturedPieces[bottomSide]}
-          active={state.currentPlayer === bottomSide}
-          selected={bottomSide === humanSide ? selectedHand : null}
-          droppable={interactive && bottomSide === humanSide}
-          pieceStyle={settings.pieceStyle}
-          onSelect={selectHand}
-          onPiecePointerDown={(type, e) => drag.arm({ kind: 'hand', type }, e)}
-        />
-      </div>
+      <GameBoard
+        state={state}
+        input={input}
+        interactive={interactive}
+        flipped={flipped}
+        pieceStyle={settings.pieceStyle}
+        moveHints={settings.moveHints}
+        label={sideLabel}
+        lastMove={lastMove}
+        animation={animation}
+        showCheckLine={checkLineVisible || dialog === 'result'}
+        overlay={demo ? <FirstMoveDemo text={demo} /> : null}
+      >
+        {ai.thinking && (
+          <div className={`thinking ${flipped ? 'thinking-bottom' : ''}`} role="status">
+            <span className="thinking-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            考え中
+          </div>
+        )}
+      </GameBoard>
 
       <KifuBar
         view={view}
@@ -769,8 +553,6 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
         </div>
       )}
 
-      {drag.ghost && <DragGhost source={drag.ghost.source} x={drag.ghost.x} y={drag.ghost.y} board={state.board} owner={humanSide} style={settings.pieceStyle} flipped={flipped} />}
-
       <ResultDialog
         open={dialog === 'result' && !!outcome}
         outcome={outcome}
@@ -820,53 +602,10 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
   )
 }
 
-/**
- * Screen row (in cells, fractional) for the hint bubble: the middle of the
- * longest run of rows that holds none of the squares it talks about.
- */
-function hintRow(cells: readonly Square[], flipped: boolean): number {
-  const busy = new Set(cells.map((c) => (flipped ? 8 - c.y : c.y)))
-  let best = { start: 0, length: 0 }
-  let start = 0
-  for (let row = 0; row <= 9; row++) {
-    if (row === 9 || busy.has(row)) {
-      if (row - start > best.length) best = { start, length: row - start }
-      start = row + 1
-    }
-  }
-  return best.length === 0 ? 4.5 : best.start + best.length / 2
-}
-
 /** The demo only makes sense when most of the board is on screen. */
 function boardMostlyVisible(): boolean {
   const rect = document.querySelector('.board-grid')?.getBoundingClientRect()
   if (!rect || rect.height === 0) return false
   const visible = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0)
   return visible / rect.height >= 0.6
-}
-
-function DragGhost({
-  source,
-  x,
-  y,
-  board,
-  owner,
-  style,
-  flipped,
-}: {
-  source: Selection
-  x: number
-  y: number
-  board: GameView['states'][number]['board']
-  owner: Player
-  style: ShogiSettings['pieceStyle']
-  flipped: boolean
-}) {
-  const piece = source.kind === 'board' ? board[source.square.y][source.square.x] : { type: source.type, owner }
-  if (!piece) return null
-  return (
-    <div className="drag-ghost" style={{ left: x, top: y }} aria-hidden="true">
-      <Piece type={piece.type} owner={piece.owner} style={style} flipped={flipped} />
-    </div>
-  )
 }

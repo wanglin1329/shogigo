@@ -1,0 +1,490 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright 2025~ Yuki Lab
+// Copyright 2026 the shogi project contributors
+// Modified 2026-09-27: re-entry while the same uid is being paired.
+// Modified 2026-09-27: import paths; 426 for a non-upgrade request; COM fallback
+// delay from BOT_FALLBACK_SECONDS; `queued` carries botAt.
+
+// Matchmaker DO integration tests: rating-window pairing into a playable MatchRoom,
+// same-uid dedupe, cancellation, the COM fallback (BOT_FALLBACK_SECONDS = 30 in
+// wrangler.jsonc) / 10min opt-out timeout,
+// the lobby counter, and rate limiting. Timeouts are exercised by rewriting
+// queuedAt inside the socket attachments and firing the alarm directly —
+// fake timers cannot advance the runtime's alarm scheduler.
+
+import {
+  env,
+  SELF,
+  runDurableObjectAlarm,
+  runInDurableObject,
+} from "cloudflare:test";
+import { describe, expect, it } from "vitest";
+import { verifyBotTicket, verifyPlayerToken } from "../../src/online/token";
+import { internalFromDisplay, RANKS, rankOf, START_RANK } from "../../src/online/rating";
+import { allowedRatingGap, choosePair } from "../../src/games/shogi/server/matchmaker";
+import type { MatchPayload } from "../../src/games/shogi/server/protocol";
+
+const UID_1 = "aaaaaaaa-1111-4111-8111-111111111111";
+const UID_2 = "bbbbbbbb-2222-4222-8222-222222222222";
+const UID_3 = "cccccccc-3333-4333-8333-333333333333";
+
+// Each connection gets its own IP so tests never trip the per-IP rate limit.
+let nextQueueIp = 1;
+function testIp(): string {
+  nextQueueIp += 1;
+  return `10.8.${Math.floor(nextQueueIp / 256)}.${nextQueueIp % 256}`;
+}
+
+type QueueMsg = {
+  type: string;
+  playing?: number;
+  room_code?: string;
+  token?: string;
+  yourSide?: "sente" | "gote";
+  opponentName?: string | null;
+  opponentRank?: number | null;
+  ticket?: string | null;
+  error?: { code: string; message: string };
+};
+
+async function connectQueue(
+  uid: string,
+  opts: { name?: string; bot?: 0 | 1; hr?: 0 | 1; ip?: string } = {},
+) {
+  const params = new URLSearchParams({ uid });
+  if (opts.name !== undefined) params.set("name", opts.name);
+  if (opts.bot !== undefined) params.set("bot", String(opts.bot));
+  if (opts.hr !== undefined) params.set("hr", String(opts.hr));
+  const res = await SELF.fetch(`https://example.com/api/match/ws?${params}`, {
+    headers: { Upgrade: "websocket", "CF-Connecting-IP": opts.ip ?? testIp() },
+  });
+  expect(res.status).toBe(101);
+  const ws = res.webSocket!;
+  const messages: QueueMsg[] = [];
+  let closed = false;
+  let closeCode: number | null = null;
+  ws.accept();
+  ws.addEventListener("message", (event) => {
+    if (typeof event.data === "string" && event.data !== "pong") {
+      messages.push(JSON.parse(event.data) as QueueMsg);
+    }
+  });
+  ws.addEventListener("close", (event) => {
+    closed = true;
+    closeCode = event.code;
+  });
+  return {
+    ws,
+    messages,
+    isClosed: () => closed,
+    closeCode: () => closeCode,
+    find: (type: string) => messages.find((m) => m.type === type),
+  };
+}
+
+function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const tick = () => {
+      if (predicate()) return resolve();
+      if (Date.now() - start > timeoutMs) return reject(new Error("waitFor timeout"));
+      setTimeout(tick, 10);
+    };
+    tick();
+  });
+}
+
+// Rewrites every queue attachment so its wait time appears to be `waitedMs`.
+async function ageQueue(waitedMs: number): Promise<void> {
+  const stub = env.MATCHMAKER.getByName("global");
+  await runInDurableObject(stub, (_instance, state) => {
+    for (const ws of state.getWebSockets()) {
+      const att = ws.deserializeAttachment() as Record<string, unknown>;
+      ws.serializeAttachment({ ...att, queuedAt: Date.now() - waitedMs });
+    }
+  });
+}
+
+async function fireAlarm(): Promise<boolean> {
+  return runDurableObjectAlarm(env.MATCHMAKER.getByName("global"));
+}
+
+async function fetchStats(): Promise<number> {
+  const res = await SELF.fetch("https://example.com/api/online-stats");
+  expect(res.status).toBe(200);
+  const json = (await res.json()) as { playing: number };
+  return json.playing;
+}
+
+describe("queue entry validation", () => {
+  it("rejects a plain GET and an invalid uid", async () => {
+    const plain = await SELF.fetch("https://example.com/api/match/ws?uid=" + UID_1);
+    // This repository answers a non-upgrade request with 426 Upgrade Required.
+    expect(plain.status).toBe(426);
+    const badUid = await SELF.fetch("https://example.com/api/match/ws?uid=x", {
+      headers: { Upgrade: "websocket" },
+    });
+    expect(badUid.status).toBe(400);
+  });
+
+  it("limits queue joins per IP (delivered as a WS error message)", async () => {
+    // HTTP 429 は new WebSocket() から見ると接続失敗(1006)にしかならないので、
+    // 上限超過は 101 で受けてから {type:"error", code:"rate_limited"} を送って閉じる
+    let limited = false;
+    for (let i = 0; i < 12 && !limited; i++) {
+      const res = await SELF.fetch(`https://example.com/api/match/ws?uid=${UID_1}`, {
+        headers: { Upgrade: "websocket", "CF-Connecting-IP": "203.0.113.9" },
+      });
+      expect(res.status).toBe(101);
+      const ws = res.webSocket!;
+      const messages: QueueMsg[] = [];
+      ws.accept();
+      ws.addEventListener("message", (event) => {
+        if (typeof event.data === "string") messages.push(JSON.parse(event.data) as QueueMsg);
+      });
+      await waitFor(() => messages.length >= 1);
+      if (messages.some((m) => m.type === "error" && m.error?.code === "rate_limited")) {
+        limited = true;
+      }
+      ws.close();
+    }
+    expect(limited).toBe(true);
+  });
+});
+
+describe("pairing", () => {
+  it("pairs two waiters and wires them into a playable matchmaking room", async () => {
+    const a = await connectQueue(UID_1, { name: "alice" });
+    await waitFor(() => a.find("queued") !== undefined);
+    // The lone waiter counts itself (rooms×2 + waiting = 1).
+    expect(a.find("queued")!.playing).toBe(1);
+
+    const b = await connectQueue(UID_2, { name: "bob" });
+    await waitFor(() => a.find("matched") !== undefined && b.find("matched") !== undefined);
+
+    const ma = a.find("matched")!;
+    const mb = b.find("matched")!;
+    expect(ma.room_code).toBe(mb.room_code);
+    expect(ma.yourSide).not.toBe(mb.yourSide);
+    expect(ma.opponentName).toBe("bob");
+    expect(mb.opponentName).toBe("alice");
+    // 相手の段級位は成立の時点で配る（実力値の数値は配らない）
+    expect(ma.opponentRank).toBe(START_RANK);
+    expect(mb.opponentRank).toBe(START_RANK);
+    expect(ma.token).not.toBe(mb.token);
+
+    // Tokens are real seat credentials for that room.
+    const payload = await verifyPlayerToken(ma.token!, env.TOKEN_SECRET, Date.now());
+    expect(payload).not.toBeNull();
+    expect(payload!.roomCode).toBe(ma.room_code);
+    expect(payload!.side).toBe(ma.yourSide);
+
+    const stateRes = await SELF.fetch(
+      `https://example.com/api/rooms/${ma.room_code}/state`,
+      { headers: { Authorization: `Bearer ${ma.token}` } },
+    );
+    expect(stateRes.status).toBe(200);
+    const state = (await stateRes.json()) as { match: MatchPayload };
+    expect(state.match.match_type).toBe("matchmaking");
+    // 対局結果の段位カード用に、両者の段級位が部屋に預けられている
+    expect(state.match.sente_rank).toBe(START_RANK);
+    expect(state.match.gote_rank).toBe(START_RANK);
+    expect(RANKS[state.match.sente_rank!].label).toBe("5級");
+    expect(state.match.tc_type).toBe("per_move");
+    expect(state.match.tc_seconds).toBe(30);
+    expect(state.match.sente_joined).toBe(true);
+    expect(state.match.gote_joined).toBe(true);
+    expect([state.match.sente_name, state.match.gote_name].sort()).toEqual([
+      "alice",
+      "bob",
+    ]);
+
+    // The server closes both queue sockets after delivering "matched".
+    await waitFor(() => a.isClosed() && b.isClosed());
+    expect(a.closeCode()).toBe(1000);
+  });
+
+  // 「段級位・実力値を表示しない」設定（?hr=1）。出さないのは表示だけで、
+  // 点数の計算は普通に走る（終局時に MatchRoom が D1 から引き直す）。
+  it("keeps a hidden player's rank out of the opponent's view", async () => {
+    const a = await connectQueue(UID_1, { name: "alice", hr: 1 });
+    await waitFor(() => a.find("queued") !== undefined);
+    const b = await connectQueue(UID_2, { name: "bob" });
+    await waitFor(() => a.find("matched") !== undefined && b.find("matched") !== undefined);
+
+    const ma = a.find("matched")!;
+    const mb = b.find("matched")!;
+    // 隠している alice の段級位は bob に届かない。
+    // 逆向き（alice に届く bob の段級位）はサーバーでは落とさない
+    // ——出さないのはクライアントの createRankBadge() の役目
+    expect(mb.opponentRank).toBeNull();
+    expect(ma.opponentRank).toBe(START_RANK);
+
+    const stateRes = await SELF.fetch(
+      `https://example.com/api/rooms/${mb.room_code}/state`,
+      { headers: { Authorization: `Bearer ${mb.token}` } },
+    );
+    expect(stateRes.status).toBe(200);
+    const state = (await stateRes.json()) as { match: MatchPayload };
+    // 部屋にも預けない（対局中に流れるデータへ入れない）
+    const aliceSide = ma.yourSide === "sente" ? "sente_rank" : "gote_rank";
+    const bobSide = ma.yourSide === "sente" ? "gote_rank" : "sente_rank";
+    expect(state.match[aliceSide]).toBeNull();
+    expect(state.match[bobSide]).toBe(START_RANK);
+    expect(state.match[ma.yourSide === "sente" ? "sente_rank_visible" : "gote_rank_visible"]).toBe(false);
+    expect(state.match[ma.yourSide === "sente" ? "gote_rank_visible" : "sente_rank_visible"]).toBe(true);
+  });
+
+  it("supersedes an older socket with the same uid and never self-matches", async () => {
+    const first = await connectQueue(UID_1);
+    await waitFor(() => first.find("queued") !== undefined);
+    const second = await connectQueue(UID_1);
+    await waitFor(() => second.find("queued") !== undefined);
+
+    // The old tab's socket is closed; the new one neither matched nor closed.
+    await waitFor(() => first.isClosed());
+    expect(first.closeCode()).toBe(4000);
+    expect(second.find("matched")).toBeUndefined();
+
+    // A real opponent pairs with the surviving socket.
+    const other = await connectQueue(UID_2);
+    await waitFor(
+      () => second.find("matched") !== undefined && other.find("matched") !== undefined,
+    );
+    expect(second.find("matched")!.room_code).toBe(other.find("matched")!.room_code);
+  });
+
+  it("removes a cancelled waiter from the queue", async () => {
+    const a = await connectQueue(UID_1);
+    await waitFor(() => a.find("queued") !== undefined);
+    a.ws.close();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const b = await connectQueue(UID_2);
+    await waitFor(() => b.find("queued") !== undefined);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(b.find("matched")).toBeUndefined();
+    b.ws.close();
+  });
+});
+
+describe("timeouts (alarm)", () => {
+  it("waits until BOT_FALLBACK_SECONDS before offering COM", async () => {
+    const a = await connectQueue(UID_1);
+    await waitFor(() => a.find("queued") !== undefined);
+    await ageQueue(29_000);
+    await fireAlarm();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(a.find("bot")).toBeUndefined();
+    expect(a.isClosed()).toBe(false);
+    a.ws.close();
+  });
+
+  it("sends {type:'bot'} and closes after BOT_FALLBACK_SECONDS when the fallback is on", async () => {
+    const a = await connectQueue(UID_1);
+    await waitFor(() => a.find("queued") !== undefined);
+
+    await ageQueue(31_000);
+    expect(await fireAlarm()).toBe(true);
+
+    await waitFor(() => a.find("bot") !== undefined);
+    // 券は「待ち時間を待ち切った人」にしか出ない。ここが1人あたりの上限そのもの
+    const ticket = await verifyBotTicket(
+      a.find("bot")!.ticket!,
+      env.TOKEN_SECRET,
+      Date.now(),
+    );
+    expect(ticket).not.toBeNull();
+    expect(ticket!.uid).toBe(UID_1);
+
+    await waitFor(() => a.isClosed());
+    expect(a.closeCode()).toBe(1000);
+  });
+
+  it("gives a fresh ticket each time, so one cannot be replayed for another game", async () => {
+    const first = await connectQueue(UID_1);
+    await waitFor(() => first.find("queued") !== undefined);
+    await ageQueue(31_000);
+    await fireAlarm();
+    await waitFor(() => first.find("bot") !== undefined);
+
+    const second = await connectQueue(UID_2);
+    await waitFor(() => second.find("queued") !== undefined);
+    await ageQueue(31_000);
+    await fireAlarm();
+    await waitFor(() => second.find("bot") !== undefined);
+
+    expect(first.find("bot")!.ticket).not.toBe(second.find("bot")!.ticket);
+  });
+
+  it("keeps a fallback-off waiter past the COM delay but gives up at 10 minutes", async () => {
+    const a = await connectQueue(UID_1, { bot: 0 });
+    await waitFor(() => a.find("queued") !== undefined);
+
+    await ageQueue(61_000);
+    await fireAlarm();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(a.find("bot")).toBeUndefined();
+    expect(a.isClosed()).toBe(false);
+
+    await ageQueue(601_000);
+    await fireAlarm();
+    await waitFor(() => a.find("error") !== undefined);
+    expect(a.find("error")!.error!.code).toBe("queue_timeout");
+    await waitFor(() => a.isClosed());
+  });
+});
+
+describe("online-stats", () => {
+  it("reports rooms×2 + waiting, and degrades to 0 when idle", async () => {
+    expect(await fetchStats()).toBe(0);
+
+    // One pair plays, one waiter remains: 1 room × 2 + 1 = 3.
+    const a = await connectQueue(UID_1);
+    const b = await connectQueue(UID_2);
+    await waitFor(() => a.find("matched") !== undefined && b.find("matched") !== undefined);
+    const c = await connectQueue(UID_3, { bot: 0 });
+    await waitFor(() => c.find("queued") !== undefined);
+
+    expect(await fetchStats()).toBe(3);
+
+    c.ws.close();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(await fetchStats()).toBe(2);
+  });
+});
+
+describe("rating window (pure)", () => {
+  it("opens at 200, widens 25 per second and lifts at 30s", () => {
+    expect(allowedRatingGap(0)).toBe(200);
+    expect(allowedRatingGap(10_000)).toBe(450);
+    expect(allowedRatingGap(20_000)).toBe(700);
+    expect(allowedRatingGap(29_999)).toBeLessThan(1000);
+    expect(allowedRatingGap(30_000)).toBe(Infinity);
+  });
+
+  it("uses the longer wait, picks the closest rating, and keeps FIFO on ties", () => {
+    const now = 100_000;
+    // 二段 waited 10s (window 450): 5級 is out of reach, 初段 is in
+    const seekers = [
+      { queuedAt: now - 10_000, rating: 2150 },
+      { queuedAt: now - 3_000, rating: 1500 },
+      { queuedAt: now - 1_000, rating: 2075 },
+    ];
+    expect(choosePair(seekers, now)).toEqual([0, 2]);
+    // nobody in reach yet → no pair; once the longer wait passes 30s the window lifts
+    expect(choosePair([seekers[0], seekers[1]], now)).toBeNull();
+    expect(choosePair([seekers[0], seekers[1]], now + 21_000)).toEqual([0, 1]);
+    // ties go to whoever queued first
+    expect(
+      choosePair(
+        [
+          { queuedAt: 0, rating: 1500 },
+          { queuedAt: 1, rating: 1600 },
+          { queuedAt: 2, rating: 1600 },
+        ],
+        3,
+      ),
+    ).toEqual([0, 1]);
+  });
+
+  it("treats an unknown rating (D1 down) as compatible with anyone", () => {
+    expect(
+      choosePair(
+        [
+          { queuedAt: 0, rating: null },
+          { queuedAt: 1, rating: 2900 },
+        ],
+        2,
+      ),
+    ).toEqual([0, 1]);
+  });
+});
+
+describe("pairing by rating", () => {
+  async function seedRating(uid: string, display: number): Promise<void> {
+    await env.DB.prepare(
+      "INSERT INTO player_rating (uid, rating, best_rank, updated_at) VALUES (?1, ?2, ?3, ?4)",
+    )
+      .bind(uid, internalFromDisplay(display), START_RANK, Date.now())
+      .run();
+  }
+
+  it("holds a 二段 for a closer opponent instead of the 5級 who queued first", async () => {
+    await seedRating(UID_1, 2150);
+    await seedRating(UID_2, 1500);
+    await seedRating(UID_3, 2075);
+
+    const nidan = await connectQueue(UID_1);
+    await waitFor(() => nidan.find("queued") !== undefined);
+    const gokyu = await connectQueue(UID_2);
+    await waitFor(() => gokyu.find("queued") !== undefined);
+    // 差650 は並んだ直後の窓（200）に入らない
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(nidan.find("matched")).toBeUndefined();
+    expect(gokyu.find("matched")).toBeUndefined();
+
+    // 差75 の初段が来たら、先に並んでいた5級を飛ばして二段と組む
+    const shodan = await connectQueue(UID_3);
+    await waitFor(
+      () => nidan.find("matched") !== undefined && shodan.find("matched") !== undefined,
+    );
+    expect(nidan.find("matched")!.room_code).toBe(shodan.find("matched")!.room_code);
+    expect(gokyu.find("matched")).toBeUndefined();
+    // 成立画面の段級位は並んだ時点で引いた値（実力値の数値は配らない）
+    expect(shodan.find("matched")!.opponentRank).toBe(rankOf(2150));
+    expect(RANKS[shodan.find("matched")!.opponentRank!].label).toBe("二段");
+    gokyu.ws.close();
+  });
+
+  it("pairs a mismatched couple once the longer waiter's window lifts (30s)", async () => {
+    await seedRating(UID_1, 2150);
+    await seedRating(UID_2, 1500);
+    const nidan = await connectQueue(UID_1);
+    await waitFor(() => nidan.find("queued") !== undefined);
+    const gokyu = await connectQueue(UID_2);
+    await waitFor(() => gokyu.find("queued") !== undefined);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(nidan.find("matched")).toBeUndefined();
+
+    await ageQueue(31_000);
+    expect(await fireAlarm()).toBe(true);
+    await waitFor(
+      () => nidan.find("matched") !== undefined && gokyu.find("matched") !== undefined,
+    );
+    expect(nidan.find("matched")!.room_code).toBe(gokyu.find("matched")!.room_code);
+  });
+});
+
+describe("re-entry while being paired", () => {
+  it("refuses a second connection for a uid that is mid-pairing and leaves the first alone", async () => {
+    const first = await connectQueue(UID_1, { name: "alice" });
+    await waitFor(() => first.messages.some((m) => m.type === "queued"));
+    // Put the first socket in the state pairUp() is in: claimed, room not yet made.
+    await runInDurableObject(env.MATCHMAKER.getByName("global"), (_instance, state) => {
+      for (const ws of state.getWebSockets(UID_1)) {
+        const att = ws.deserializeAttachment() as Record<string, unknown>;
+        ws.serializeAttachment({ ...att, matched: true, matchedAt: Date.now() });
+      }
+    });
+
+    const second = await connectQueue(UID_1, { name: "alice" });
+    await waitFor(() => second.find("error") !== undefined);
+    expect(second.find("error")?.error?.code).toBe("already_matched");
+    await waitFor(() => second.isClosed());
+    // The seat being paired is not superseded.
+    expect(first.isClosed()).toBe(false);
+    first.ws.close();
+  });
+
+  it("still supersedes a plain waiting socket for the same uid", async () => {
+    const first = await connectQueue(UID_1, { name: "alice" });
+    await waitFor(() => first.messages.some((m) => m.type === "queued"));
+    const second = await connectQueue(UID_1, { name: "alice" });
+    await waitFor(() => second.messages.some((m) => m.type === "queued"));
+    await waitFor(() => first.isClosed());
+    expect(first.closeCode()).toBe(4000);
+    second.ws.close();
+  });
+});
+

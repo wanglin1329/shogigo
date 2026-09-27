@@ -1,0 +1,155 @@
+/* Site chrome: header, footer, text pages (docs/PLAN.md §9.5-2). */
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 960px;
+  height: 48px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+.site-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.site-logo-text {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.site-logo-go {
+  color: var(--shu);
+}
+.site-header-link {
+  padding: 8px 4px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  text-decoration: none;
+}
+.site-header-link:hover,
+.site-logo:hover .site-logo-text {
+  text-decoration: underline;
+}
+
+.site-footer {
+  max-width: 960px;
+  margin: 48px auto 0;
+  padding: 24px 16px 32px;
+  border-top: 1px solid #e3d8c3;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.site-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.site-footer-nav a {
+  color: inherit;
+  text-decoration: none;
+}
+.site-footer-nav a:hover {
+  text-decoration: underline;
+}
+.site-footer-copy {
+  margin: 16px 0 0;
+}
+
+/* ------------------------------------------------------------------ text pages (legal, 404) and the guide under each game */
+.site-page,
+.guide {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+  line-height: 1.85;
+  font-size: 15px;
+}
+.site-page h1,
+.guide h1 {
+  margin: 8px 0 16px;
+  font-size: 24px;
+  line-height: 1.4;
+}
+.site-page h2,
+.guide h2 {
+  margin: 36px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e3d8c3;
+  font-size: 19px;
+  line-height: 1.45;
+}
+.site-page h3,
+.guide h3 {
+  margin: 24px 0 6px;
+  font-size: 16px;
+}
+.site-page p,
+.guide p {
+  margin: 0 0 12px;
+}
+.site-page ul,
+.site-page ol,
+.guide ul,
+.guide ol {
+  margin: 0 0 12px;
+  padding-left: 1.4em;
+}
+.site-page ul,
+.guide ul {
+  list-style: disc;
+}
+.site-page ol,
+.guide ol {
+  list-style: decimal;
+}
+.site-page li,
+.guide li {
+  margin: 4px 0;
+}
+.site-page a,
+.guide a {
+  color: var(--focus);
+  text-decoration: underline;
+}
+.site-page table,
+.guide table {
+  width: 100%;
+  margin: 0 0 16px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.site-page th,
+.site-page td,
+.guide th,
+.guide td {
+  padding: 8px 10px;
+  border: 1px solid #e3d8c3;
+  text-align: left;
+  vertical-align: top;
+}
+.site-page th,
+.guide th {
+  background: #efe6d4;
+  white-space: nowrap;
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.site-page .updated {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.guide-lead {
+  font-size: 16px;
+}
+.faq dt {
+  margin-top: 16px;
+  font-weight: 700;
+}
+.faq dd {
+  margin: 4px 0 0;
+}

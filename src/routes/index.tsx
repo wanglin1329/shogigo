@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 
+import { HOME_COPY, HomeGuide } from '../content/home'
 import { ShogiGame } from '../games/shogi/ui/ShogiGame'
 import type { SharedKifuLink } from '../games/shogi/ui/ShogiGame'
 import { ModeTabs } from '../site/ModeTabs'
+import { gameJsonLd, pageHead, siteJsonLd } from '../site/seo'
+
+const OG_IMAGE = '/og/home.jpg'
 
 // Prerendered page. Search params (e.g. `?k=` kifu links) are typed here but
 // only applied after hydration: the static HTML was rendered without them, so
@@ -13,6 +17,11 @@ export const Route = createFileRoute('/')({
     ...(typeof search.k === 'string' ? { k: search.k } : {}),
     ...(typeof search.m === 'number' || typeof search.m === 'string' ? { m: Number(search.m) } : {}),
   }),
+  head: () =>
+    pageHead({ path: '/', title: HOME_COPY.title, description: HOME_COPY.description, ogImage: OG_IMAGE, pieceFont: true }, [
+      ...siteJsonLd(),
+      gameJsonLd({ name: HOME_COPY.h1, description: HOME_COPY.description, path: '/', ogImage: OG_IMAGE }),
+    ]),
   component: Home,
 })
 
@@ -22,10 +31,11 @@ function Home() {
   useEffect(() => setShared(k ? { k, m: m !== undefined && Number.isFinite(m) ? m : null } : null), [k, m])
 
   return (
-    <main className="px-2 py-4 sm:py-8">
+    <main className="px-2 pb-4">
       <ModeTabs current="ai" />
-      <h1 className="sr-only">将棋 — AIと対局</h1>
+      <h1 className="sr-only">{HOME_COPY.h1}</h1>
       <ShogiGame shared={shared} />
+      <HomeGuide />
     </main>
   )
 }

@@ -3,6 +3,17 @@
 @import './styles/waza.css';
 @import './styles/records.css';
 @import './styles/board-mode.css';
+@import './styles/site.css';
+
+/* Piece glyphs only: a subset of Shippori Mincho B1 (SIL OFL 1.1, public/fonts/OFL.txt).
+   Self-hosted so that no page load contacts a third party (docs/PLAN.md §9.5-4). */
+@font-face {
+  font-family: 'Shippori Mincho B1';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/shippori-mincho-b1-700-pieces.woff2') format('woff2');
+}
 
 :root {
   color-scheme: light;

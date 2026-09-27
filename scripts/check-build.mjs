@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { parseEnv } from 'node:util'
 
 const ssrRoutes = JSON.parse(readFileSync('src/site/ssr-routes.json', 'utf8')).paths
 const clientDir = 'dist/client'
@@ -32,9 +33,27 @@ for (const route of ssrRoutes) {
   if (frozen.length) failures.push(`SSR route ${route} was prerendered: ${frozen.join(', ')}`)
 }
 
-// 2. Pages that must be prerendered.
-for (const page of ['/index.html', '/board.html']) {
+// 2. Pages and generated files that must be prerendered. /contact exists
+//    exactly when a contact address is configured (env/.env).
+// Node's parser is the one Vite uses for env files.
+const publicEnv = parseEnv(readFileSync('env/.env', 'utf8'))
+const contactEmail = publicEnv.VITE_CONTACT_EMAIL?.trim() ?? ''
+for (const page of [
+  '/index.html',
+  '/board.html',
+  '/online.html',
+  '/records.html',
+  '/about.html',
+  '/privacy.html',
+  '/terms.html',
+  '/license.html',
+  '/sitemap.xml',
+  '/robots.txt',
+]) {
   if (!files.includes(page)) failures.push(`expected prerendered page ${page}`)
+}
+if (files.includes('/contact.html') !== (contactEmail !== '')) {
+  failures.push(`/contact.html must exist exactly when VITE_CONTACT_EMAIL is set (set: ${contactEmail !== ''})`)
 }
 
 // 3. Static asset headers and GPL engine files must ship.
@@ -68,6 +87,12 @@ if (existsSync('.dev.vars')) {
     const body = readFileSync(path, 'latin1')
     if (secrets.some((s) => body.includes(s))) failures.push(`a .dev.vars value appears in ${path}`)
   }
+}
+
+// 6. env/.env is committed and ships to the browser: only the known public keys.
+const PUBLIC_KEYS = ['VITE_SITE_URL', 'VITE_CONTACT_EMAIL', 'VITE_SOURCE_URL', 'VITE_PLAUSIBLE_SRC']
+for (const key of Object.keys(publicEnv)) {
+  if (!PUBLIC_KEYS.includes(key)) failures.push(`env/.env has ${key}: only public keys (${PUBLIC_KEYS.join(', ')}) belong there`)
 }
 
 if (failures.length) {

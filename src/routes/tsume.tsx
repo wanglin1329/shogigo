@@ -12,6 +12,8 @@ const getToday = createServerFn({ method: 'GET' }).handler(() => {
 
 export const Route = createFileRoute('/tsume')({
   loader: () => getToday(),
+  // Placeholder until P4: crawlable but never indexed, not in the sitemap, not linked.
+  head: () => ({ meta: [{ title: '詰将棋（準備中）' }, { name: 'robots', content: 'noindex' }] }),
   // Edge-cached until the next JST midnight; browsers always revalidate. The
   // TTL uses the same instant the date was computed from, so a render that
   // straddles midnight cannot pin yesterday's page for a whole new day.

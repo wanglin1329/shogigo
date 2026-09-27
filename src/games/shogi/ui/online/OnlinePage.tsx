@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { DEFAULT_AI_LEVEL, resolvePlayableLevel } from '../../ai/levels'
+import { DEFAULT_AI_LEVEL, isAiLevelId } from '../../ai/levels'
 import type { Player } from '../../core/engine'
 import * as api from '../../online/api'
 import type { RoomEntry, TimeControl } from '../../online/api'
@@ -51,6 +51,10 @@ function setRoomParam(code: string | null) {
 
 function inviteUrl(code: string) {
   return `${location.origin}/online?room=${encodeURIComponent(code)}`
+}
+
+function aiLevelOrDefault(stored: unknown) {
+  return isAiLevelId(stored) ? stored : DEFAULT_AI_LEVEL
 }
 
 export function OnlinePage({ roomParam }: { roomParam: string | null }) {
@@ -128,7 +132,9 @@ export function OnlinePage({ roomParam }: { roomParam: string | null }) {
         kind: 'bot',
         options: {
           ticket: s.ticket,
-          level: resolvePlayableLevel(readJson('shogi.ai.level') ?? DEFAULT_AI_LEVEL, new Set()),
+          // The AI page's last level; comLevelFor() turns every やねうら王 level
+          // (伝説 included, so no unlock check here) into 超級.
+          level: aiLevelOrDefault(readJson('shogi.ai.level')),
           playerName: wireName(profile),
           playerRank: stats.rating?.rank ?? null,
           hideRank: settings.hideRank,
@@ -309,7 +315,7 @@ export function OnlinePage({ roomParam }: { roomParam: string | null }) {
 
       <section className="lobby-card">
         <h2>友だちと対局</h2>
-        <p className="setting-note">招待リンクを送ると、相手が開いたときに対局が始まります。アプリの登録はいりません。</p>
+        <p className="setting-note">招待リンクを送ると、相手が開いたときに対局が始まります。相手はリンクを開くだけで参加できます。</p>
         <fieldset className="setting-group">
           <legend>あなたの手番</legend>
           <div className="segmented" role="radiogroup">

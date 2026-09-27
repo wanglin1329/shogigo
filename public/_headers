@@ -3,3 +3,9 @@
 # forever; a new engine build goes into a new directory.
 /games/shogi/engine/yaneuraou-v7.63/*
   Cache-Control: public, max-age=31536000, immutable
+
+# The workers.dev preview host must never be indexed: the canonical site is
+# the custom domain (docs/PLAN.md §9.5-5). Host-specific rule; the Worker adds
+# the same header to the responses it generates (src/server.ts).
+https://shogi.wsyl1329.workers.dev/*
+  X-Robots-Tag: noindex

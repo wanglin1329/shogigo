@@ -3,14 +3,20 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import type { RecordMode } from '../games/shogi/core/records/types'
 import { RecordsPage, isRecordMode } from '../games/shogi/ui/records/RecordsPage'
+import { SITE_NAME } from '../site/brand'
+import { pageHead } from '../site/seo'
 
 // Personal data kept in this browser only: prerendered shell, never indexed.
 export const Route = createFileRoute('/records')({
   validateSearch: (search: Record<string, unknown>): { tab?: RecordMode } =>
     isRecordMode(search.tab) && search.tab !== 'all' ? { tab: search.tab } : {},
-  head: () => ({
-    meta: [{ title: '戦績' }, { name: 'robots', content: 'noindex' }],
-  }),
+  head: () =>
+    pageHead({
+      path: '/records',
+      title: `戦績｜${SITE_NAME}`,
+      description: 'このブラウザに保存された将棋の対局記録です。勝率や出した手筋・囲いを振り返れます。',
+      noindex: true,
+    }),
   component: Records,
 })
 

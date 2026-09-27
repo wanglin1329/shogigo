@@ -22,5 +22,10 @@
 - 段級位を隠した人の評価・段位は受け手ごとに消す（`redactRatings`）。MatchPayload を全員に同じ物を送らない
 - 技演出（`WazaEffect`）の出し入れは上流 `maybeShowWaza` と同じ規則。**相手の着手では消さない**（AI は 1 秒以内に応手するので、消すと演出が見えない）。`trigger` は実際に指した時だけ変わる値（盤のアニメ id）を渡す
 - 対局記録は同じ id で保存し直すと上書き。id は AI・将棋盤が `GameMeta`（localStorage）、通信対戦が `部屋コード:created_at`（部屋コードは期限切れ後に再利用される）。新しい対局を始める処理では必ず新しい `GameMeta` を作る
+- 公開設定（サイトURL・問い合わせ先・ソースURL・Plausible）は入庫している `env/.env`（Vite `envDir`）。**公開値だけ**。秘密値を入れない
+- ゲームページの文案は `src/content/*.tsx`。字数・句点位置・禁用词は `test/core/copy.spec.ts` が検査する。事実（強さの段階、千日手、30秒/60秒など）はコードで確かめてから書く。**文案を直したら同じコミットで `src/content/lastmod.ts` の日付も直す**（sitemap の lastmod はここだけが出どころ。`new Date()` 禁止）
+- 新しい公開ページは `LASTMOD` に足す（sitemap に入る）。sitemap.xml / robots.txt は server route をビルド時に静的化（`vite.config.ts` の `pages`）
+- workers.dev は noindex（静的ファイルは `public/_headers` のホスト指定、Worker の応答は `server.ts`）。独自ドメイン確定後は `workers_dev: false`
+- OG 画像・アイコンは `scripts/og/generate.py` で作って入庫（CI では作らない）
 - 本番の D1 は変更のたびに `wrangler d1 migrations apply shogi --remote` を先に
 - ポート: dev 3160 / preview 3161（3100・3101 はユーザー用）

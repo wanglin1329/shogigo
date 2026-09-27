@@ -1,6 +1,6 @@
 # 将棋サイト 新規プロジェクト 実装計画（v3）
 
-> 状态：v3.1，P0 / P1 / P3 / P2 完成（§9.1–9.4）。M1 剩 P5a（正文・法务・SEO，待品牌名 D2）。D1 / D3 / D4 已定；D2 / D5 仍待拍板（§1.2）。修订经过见文末「修订记录」。
+> 状态：v3.1，P0 / P1 / P3 / P2 / P5a 完成（§9.1–9.6）。M1 只剩上线操作（§9.5-7 清单）。D1–D7 全部已定（§1.1）。修订经过见文末「修订记录」。
 > 调研原始报告：`docs/research/`（A 对局 UX / B AI 引擎 / C 联机协议逆向 / D 内容与 SEO / E 上游源码）。
 > 参考站：参考站 。其源码 **全部以 GPL-3.0 公开**：参考站的源码
 > 本地只读副本：`/Users/yl/project/downgame/shogi-upstream`（源码）、`/Users/yl/project/downgame/shogi-live-20260927`（线上快照）。
@@ -27,14 +27,15 @@
 |---|---|---|
 | **D1** | 许可证路线 | **A：本项目以 GPL-3.0-only 公开源码**，直接移植上游约 1 万行纯逻辑 TS（服务端、规则引擎、棋谱、技判定、诘将棋求解器、昵称、战绩存储），只重写 UI。**整站前端源码公开，包括以后加进来的游戏** |
 | **D4** | 匹配等不到人时切 COM 的秒数 | **30 秒**（服务端 `BOT_FALLBACK_SECONDS`，可配）。上游把「等 60 秒才发 ticket」当作 COM 局限流的一环，改 30 秒后这个上限翻倍；每日 20 局上限不变。P3 移植时同步改注释、假设和测试（`matchmaker.ts:343`） |
+| **D2** | 品牌名 / 域名 | **shogigo / `shogigo.com`**（2026-09-27 在 Cloudflare Registrar 注册）。不用「参考站」及其 logo |
+| **D5** | 统计 / 广告 | **首发只上 Plausible**（与其他站同一个自建实例，脚本地址走环境变量，没配就不加载）。不放广告和广告位，隐私政策也不写 AdSense；以后要加时再改隐私政策 |
+| **D6** | 运营者 / 联系方式 / 源码 | 运营者「shogigo運営事務局」；联系邮箱 `hi@shogigo.com`（走配置，空则お問い合わせ页 404；需在 Cloudflare Email Routing 转发）；源码仓库 `github.com/wanglin1329/shigigo`（上线时改为公开）。域名在 P5a 完成后再绑定 |
+| **D7** | 水匠 Petite 评价函数 | **按现状分发，不单独向作者确认**（用户 2026-09-27 决定，已知有一定权利风险）。与参考站、mizar 的 GPL 发布包做法相同；在 `/license` 和 NOTICE 里写明出处（たややん）。调查过程：mizar/YaneuraOu.wasm 的 README 与发布页、やねうら王官网的水匠5 单体发布公告、`yaneurao/YaneuraOu` 的 suisho5 发布页，都没有写明许可条款 |
 | **D3** | 框架与部署 | **TanStack Start 官方 Cloudflare 起步方式（MIT）**：`@cloudflare/vite-plugin` 构建，部署到一个 Worker。页面、`/api/*`、DO、D1 同源。不用 ShipAny：它的协议禁止公开源码，与 D1 冲突；而且支付、积分、RBAC 等功能都用不上 |
 
 ### 1.2 仍待拍板
 
-| # | 事项 | 推荐 | 备选与代价 |
-|---|---|---|---|
-| D2 | 品牌名 / 域名 | 待定。不能用「参考站」及其 logo | — |
-| D5 | 统计 / 广告 | 沿用你其他站的 Plausible + AdSense，ID 全走环境变量（Vite 下客户端可见的变量用 `VITE_` 前缀） | 参考站用的是 GA4 |
+目前没有。
 
 ### 1.3 GPL 合规清单（D1）
 
@@ -422,7 +423,7 @@ GPL 是「分发时生效」：
 
 **首发必须有（P5a，与联机一起上线）：**
 
-- `/`、`/board/`、`/online/` 各自有独立 title 和 description（80〜110 字），**H1 带关键词**（参考站三页的 H1 都只是品牌名）。模式切换 tab 用真 `<a>` 链接。
+- `/`、`/board`、`/online` 各自有独立 title 和 description（字数按 §9.5-3 的文案规范），**H1 带关键词**（参考站三页的 H1 都只是品牌名）。模式切换 tab 用真 `<a>` 链接。
 - 每页正文 1,500〜3,000 字原创说明 + FAQ，全部基于本站实际行为书写（难度档数、禁手处理、掉线 60 秒、自动存档等）。
 - 法务页：プライバシーポリシー（按電気通信事業法列出外部发送：Plausible / AdSense）、利用規約、運営者情報、お問い合わせ。**「ライセンス / ソースコード」页**：列出 GPL 组件、上游致谢、源码链接。
 - 结构化数据：首页用 `WebSite` + `Organization`；各页用 `BreadcrumbList` + `WebApplication`（`offers.price: 0`）。**不输出 aggregateRating**。
@@ -631,7 +632,157 @@ M1 的验收**只盯四件事**：完整的 AI 对局、友达对战、随机匹
   - 复核时补的一条：将棋盘导入棋谱后一手未下就能投了，会把导入的棋谱存成一局；现在导入后到第一手之前不显示投了（`GameMeta.imported`，刷新后仍有效），对局开始时间从第一手算起。
 - 顺手修了：设置里文字较长的复选框被挤小的问题（P3 遗留）。
 
+## 9.5 P5a 方案（2026-09-27，实现前；已吸收 codex review）
 
+目标：`shogigo.com` 上线所需的全部内容与 SEO。广告不做（D5）。做完再绑域名（D6）。
+
+**1. 站点配置（不写死，D6）**
+- 构建期的公开配置放在入库的 `.env.production` / `.env.development`。`.gitignore` 对这两个文件开例外；文件头注明「只放公开值，密钥一律进 `.dev.vars` / `wrangler secret`」，`check-build` 的密钥扫描照常覆盖它们。
+  - 变量：`VITE_SITE_URL`（生产 `https://shogigo.com`，开发 `http://localhost:3160`）、`VITE_CONTACT_EMAIL=hi@shogigo.com`、`VITE_PLAUSIBLE_SRC`（先留空）。
+  - 这些值在构建时就固定进预渲染页面和 Worker bundle，CI 只要检出仓库就能拿到。**不依赖**被忽略的 `.env`（codex BLOCKER）。
+  - Worker 运行时才需要的值，今后放 wrangler `vars`。
+- `src/site/config.ts` 统一读取和校验：
+  - `SITE_URL` 缺失时构建失败；
+  - `CONTACT_EMAIL` 为空时不生成 `/contact`，页脚也不出链接；
+  - `PLAUSIBLE_SRC` 为空时不加载统计脚本。
+- 品牌常量 `src/site/brand.ts`：站名 `shogigo`、运营者「shogigo運営事務局」、源码仓库 URL。
+
+**2. 外壳**
+- 页头：wordmark「shogigo」（自绘 SVG）链到 `/`，右侧是「戦績」。
+- 页脚：運営者情報 / プライバシーポリシー / 利用規約 / お問い合わせ / ライセンス・ソースコード / 戦績。
+- favicon：SVG + 32px PNG + 180px apple-touch-icon。
+- 404 页：状态码 404，页面上说明情况，并放回首页的链接。
+
+**3. 三个游戏页的文案**（`/`、`/board`、`/online`）
+- 按文案规范（memory `mahjong-seo-meta-rules`）逐条执行：
+  - title 不超过 28 字，版式 `名｜説明`，不放品牌名；
+  - description 75–80 字；
+  - 正文首段 75–80 字，用「〇〇は、〜です」的定义句开头；
+  - description 和首段在前 60 字内都要有句号，最后一个「。」的位置不小于 55；
+  - 不写 登録 / ダウンロード / インストール；
+  - description 不写「对手是电脑」。
+- 页面结构：
+  - H1 带关键词；
+  - 说明区放在棋盘下方，首段是说明区的第一段（棋盘仍在首屏）；
+  - 三页的结构、FAQ 的问法、结尾都各写各的；定型化靠人工审稿把关。
+- 本文 1,500–3,000 字，加上看得见的 FAQ。所有「本站会怎样」的描述都要在代码里核实过：
+  - 11 档难度及其名称，伝説档的解锁方式；
+  - 反则会被拦下并说明原因（二歩 / 打ち歩詰め / 行き所のない駒 / 自殺手）；
+  - 同一局面出现 4 次为千日手、判和；连续王手的千日手判王手方负；
+  - 没有入玉宣言；
+  - 自动存档，用 ＜ 回退后可以从那里重新走；
+  - 棋谱导入支持 KIF / USI；
+  - 随机对战 30 秒找不到对手就切换 COM；掉线 60 秒判负；
+  - 段级位从 9級 到 六段；
+  - 练习对局的解锁条件。
+- 关键词密度只作参考，不硬塞。
+- 文案以代码常量的形式放在 `src/content/`，每页带 `updatedAt`。
+
+**4. 法务与信任页**（全部预渲染）
+- 页面：`/about`、`/privacy`、`/terms`、`/contact`、`/license`。
+- 驹字字体改为自托管子集，同时删掉 `__root.tsx` 里 Google Fonts 的样式和 preconnect。这样浏览器自动发往外部的请求只剩 Plausible。
+- 隐私政策（外部送信規律）：
+  - 自动发送的只有 Plausible（不用 Cookie；按自建实例实际的脚本和事件端点来写）；
+  - X / LINE 分享是用户点击后才打开的链接，分开说明；
+  - 二维码在本地生成，不发往外部。
+- 本站自己保存的数据：
+  - localStorage：设置、对局、昵称、uid；
+  - IndexedDB：战绩；
+  - `__Host-sg_uid` Cookie：有效期 400 天；
+  - D1：uid、实力值、胜负数（没有设保留期限，照实写，并写明删除请求怎么提）；
+  - 对局房间在 24 小时后删除。
+- `/license`：
+  - 本站 GPL-3.0-only 与源码链接；
+  - 上游「参考站」（参考站）的致谢；
+  - やねうら王（GPL-3.0）及对应源码 `third_party/yaneuraou/`；
+  - 评价函数（见下）；
+  - 各依赖的许可证。
+- 水匠 Petite 权重：按现状分发，在 `/license` 写明出处（D7）。
+
+**5. SEO 基础**
+- canonical、`og:url`、sitemap 的 `<loc>`、站内链接统一**不带结尾斜杠**（`/board`；首页是 `/`）。与现在 `/board/` 307 到 `/board` 的行为一致。
+- `pageHead()` 生成 canonical、og:*（含 `og:locale=ja_JP`、`og:site_name`）和 `twitter:card`。
+- JSON-LD：
+  - 首页：`WebSite` + `Organization`；
+  - 游戏页：`BreadcrumbList` + `VideoGame`（与其他站一致），`offers.price: 0`，`description` 与 meta 完全一致，不输出 aggregateRating；
+  - 不加 FAQPage（拿不到富结果），FAQ 只作为看得见的正文。
+- `sitemap.xml` 与 `robots.txt` 都是**构建时生成的静态文件**，lastmod 取自内容常量。每天更新的 sitemap 留到 P4。
+- `/tsume` 占位页：加 `noindex`（仍可抓取），不进 sitemap，站内不链接。**不在** robots.txt 里屏蔽它，否则爬虫看不到 noindex。
+- workers.dev 的 noindex：
+  - 静态资源：在 `public/_headers` 里按主机名 `https://shogi.wsyl1329.workers.dev/*` 加 `X-Robots-Tag: noindex`；
+  - Worker 生成的响应：在 `server.ts` 里按主机名补上；
+  - 正式域名验收后，在 wrangler 里显式写 `workers_dev: false`。
+- OG 图每页一张（1200×630 JPG），从本地 HTML 模板截图生成。生成结果入库，CI 不重新生成；模板和生成方法写在 `scripts/og/README`。
+
+**6. 统计**：只有设置了 `VITE_PLAUSIBLE_SRC` 才加载 Plausible（defer）。
+
+**7. 上线验收清单**（绑域名，要用户确认后执行）
+- [ ] Workers Paid
+- [ ] 源码仓库已公开，`/license` 的链接能打开
+- [ ] `hi@shogigo.com` 能收到信（Email Routing）
+- [ ] wrangler `routes` 加入 `shogigo.com` 的 custom domain；`www` 用 Cloudflare **Redirect Rule** 301 到裸域名。静态页面不经过 Worker，所以不能在 Worker 里做跳转
+- [ ] 两个主机名的证书都已生效；`/`、`/board`、`/online`、带查询参数的 URL、`www` 跳转都实测过
+- [ ] 正式域名下的 canonical / OG / sitemap / robots 都正确；不存在的路径返回 404
+- [ ] `workers_dev: false`
+- [ ] HSTS 在确认两个主机名的 HTTPS 都没问题后再开（可以晚于上线）
+
+**8. 测试**
+- 单元测试逐页精确检查：
+  - title / description / 首段的字数，以及第 55–60 字之间的句号；
+  - 禁用词；
+  - JSON-LD 与 meta 的 description 一致；
+  - canonical 不带结尾斜杠。
+- 构建检查：
+  - 法务页都已预渲染；
+  - sitemap 与内容常量一致；
+  - `/contact` 的生成与否和配置一致。
+
+## 9.6 P5a 进度（2026-09-28）
+
+**已实现**（§9.5 的 1–6、8）：
+- 公开配置 `env/.env`（入库，只放公开键，构建检查带白名单）。
+- 外壳：页头 wordmark、页脚、404 页（状态码 404）、favicon / apple-touch-icon / logo。驹字字体改为自托管子集，页面加载时不再请求 Google。
+- 三个游戏页：title / description / 首段按规范写好，由 `test/core/copy.spec.ts` 精确检查；正文和 FAQ 放在棋盘下方。
+  - 关键词密度约 1.0%（`/`）、1.3%（`/board`）、0.9%（`/online`）；
+  - 按 h2 → FAQ → 段首的顺序自然加过词，没有再往上硬塞。
+- 法务与信任页：`/about`、`/privacy`、`/terms`、`/contact`、`/license`。
+  - 隐私政策中的统计和外部送信部分按 `VITE_PLAUSIBLE_SRC` 生成：没配置时写「不使用」，配置后写出实际的送信域名。
+- SEO：
+  - canonical 与 OG（每页一张 OG 图，由 `scripts/og/generate.py` 生成）；
+  - JSON-LD：首页 `WebSite` + `Organization`，三个游戏页 `VideoGame`，其余页 `BreadcrumbList`；
+  - `sitemap.xml` / `robots.txt` 在构建时生成为静态文件；
+  - `/records` 与 `/tsume` 加 noindex；
+  - workers.dev 上的响应加 `X-Robots-Tag: noindex`。
+- 顺带修复：
+  - 大厅文案里的「アプリの登録はいりません」（禁用词）；
+  - 联机 COM 的强度：在 AI 模式选过伝説档的人，之前会退回中級。
+
+**review**：
+- codex 对方案的 review：3 条 BLOCKER（CI 拿不到构建配置、www 跳转不能放在 Worker 里、水匠许可）都已处理。
+- codex 对实现的 review：没有 BLOCKER；7 条 WARN 都已修复，其中 6 条是文案与实际行为不符。
+  - 段级位从 5 級开始；
+  - 伝説档的 COM 强度；
+  - 统计工具还没启用；
+  - 表示名是自由输入的；
+  - 反则理由的提示依赖设置；
+  - 双方都掉线时判和；
+  - `env/.env` 的密钥防护。
+- codex 复核修复：又补了三处。
+  - 掉线文案改成只写常见情况，并注明这段时间持ち時間照样减少；
+  - 构建检查改用 Vite 实际用的 `node:util` `parseEnv`；
+  - `VITE_PLAUSIBLE_SRC` 必须是绝对 https URL，否则构建失败。
+- 未采纳：文案里写死「30 秒」切换 COM（服务端可配置）。`online.tsx` 开头写明了改配置时要一起核对的常量。
+
+**上线前剩下的**（§9.5-7，需要用户操作或确认）：
+- Workers Paid；
+- 源码仓库改为公开；
+- `hi@` 的 Email Routing；
+- 在 Plausible 里给本站建站点，把脚本地址填进 `VITE_PLAUSIBLE_SRC`，并同时更新 `/privacy` 的日期；
+- 绑定 custom domain，`www` 用 Redirect Rule 跳转；
+- 上线验收；
+- `workers_dev: false`。
+
+## 10. 验证方式
 
 - **core**：vitest。
   - 规则：二歩、打歩詰め、必成、自将、千日手、連続王手；

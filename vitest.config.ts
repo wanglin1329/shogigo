@@ -6,6 +6,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig(async () => {
   const migrations = await readD1Migrations(path.join(__dirname, 'migrations'))
   return {
+    // Same public config as the app build (env/.env).
+    envDir: 'env',
     test: {
       projects: [
         {

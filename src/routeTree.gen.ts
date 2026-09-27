@@ -10,9 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as BoardRouteImport } from './routes/board'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as LicenseRouteImport } from './routes/license'
 import { Route as OnlineRouteImport } from './routes/online'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RecordsRouteImport } from './routes/records'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TsumeRouteImport } from './routes/tsume'
 
 const IndexRoute = IndexRouteImport.update({
@@ -20,9 +27,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BoardRoute = BoardRouteImport.update({
   id: '/board',
   path: '/board',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LicenseRoute = LicenseRouteImport.update({
+  id: '/license',
+  path: '/license',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnlineRoute = OnlineRouteImport.update({
@@ -30,9 +52,29 @@ const OnlineRoute = OnlineRouteImport.update({
   path: '/online',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RecordsRoute = RecordsRouteImport.update({
   id: '/records',
   path: '/records',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TsumeRoute = TsumeRouteImport.update({
@@ -43,39 +85,104 @@ const TsumeRoute = TsumeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/board': typeof BoardRoute
+  '/contact': typeof ContactRoute
+  '/license': typeof LicenseRoute
   '/online': typeof OnlineRoute
+  '/privacy': typeof PrivacyRoute
   '/records': typeof RecordsRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/tsume': typeof TsumeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/board': typeof BoardRoute
+  '/contact': typeof ContactRoute
+  '/license': typeof LicenseRoute
   '/online': typeof OnlineRoute
+  '/privacy': typeof PrivacyRoute
   '/records': typeof RecordsRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/tsume': typeof TsumeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/board': typeof BoardRoute
+  '/contact': typeof ContactRoute
+  '/license': typeof LicenseRoute
   '/online': typeof OnlineRoute
+  '/privacy': typeof PrivacyRoute
   '/records': typeof RecordsRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/tsume': typeof TsumeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/board' | '/online' | '/records' | '/tsume'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/board'
+    | '/contact'
+    | '/license'
+    | '/online'
+    | '/privacy'
+    | '/records'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/terms'
+    | '/tsume'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/board' | '/online' | '/records' | '/tsume'
-  id: '__root__' | '/' | '/board' | '/online' | '/records' | '/tsume'
+  to:
+    | '/'
+    | '/about'
+    | '/board'
+    | '/contact'
+    | '/license'
+    | '/online'
+    | '/privacy'
+    | '/records'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/terms'
+    | '/tsume'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/board'
+    | '/contact'
+    | '/license'
+    | '/online'
+    | '/privacy'
+    | '/records'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/terms'
+    | '/tsume'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   BoardRoute: typeof BoardRoute
+  ContactRoute: typeof ContactRoute
+  LicenseRoute: typeof LicenseRoute
   OnlineRoute: typeof OnlineRoute
+  PrivacyRoute: typeof PrivacyRoute
   RecordsRoute: typeof RecordsRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TermsRoute: typeof TermsRoute
   TsumeRoute: typeof TsumeRoute
 }
 
@@ -88,11 +195,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/board': {
       id: '/board'
       path: '/board'
       fullPath: '/board'
       preLoaderRoute: typeof BoardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/license': {
+      id: '/license'
+      path: '/license'
+      fullPath: '/license'
+      preLoaderRoute: typeof LicenseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/online': {
@@ -102,11 +230,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnlineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/records': {
       id: '/records'
       path: '/records'
       fullPath: '/records'
       preLoaderRoute: typeof RecordsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tsume': {
@@ -121,9 +277,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   BoardRoute: BoardRoute,
+  ContactRoute: ContactRoute,
+  LicenseRoute: LicenseRoute,
   OnlineRoute: OnlineRoute,
+  PrivacyRoute: PrivacyRoute,
   RecordsRoute: RecordsRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TermsRoute: TermsRoute,
   TsumeRoute: TsumeRoute,
 }
 export const routeTree = rootRouteImport

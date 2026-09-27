@@ -1,6 +1,6 @@
 # 将棋サイト 新規プロジェクト 実装計画（v3）
 
-> 状态：v3.1，P0 进行中（进度见 §9.1）。D1 / D3 / D4 已定；D2 / D5 仍待拍板（§1.2）。修订经过见文末「修订记录」。
+> 状态：v3.1，P0 完成（§9.1），P1 进行中。D1 / D3 / D4 已定；D2 / D5 仍待拍板（§1.2）。修订经过见文末「修订记录」。
 > 调研原始报告：`docs/research/`（A 对局 UX / B AI 引擎 / C 联机协议逆向 / D 内容与 SEO / E 上游源码）。
 > 参考站：参考站 。其源码 **全部以 GPL-3.0 公开**：参考站的源码
 > 本地只读副本：`/Users/yl/project/downgame/shogi-upstream`（源码）、`/Users/yl/project/downgame/shogi-live-20260927`（线上快照）。
@@ -503,10 +503,19 @@ M1 的验收**只盯四件事**：完整的 AI 对局、友达对战、随机匹
 - wasm 对应源码补上上游 Dockerfile 会克隆的 usumerican 仓库（固定到提交 `4568f76`）。核实结果：它的文件都被上游的补丁版覆盖，不进入最终产物，但为了能离线重建仍然镜像。离线重建并比对 sha256 尚未执行。
 - 未采纳：在 `_headers` 里显式写 wasm 的 `Content-Type`。静态资源服务已按扩展名返回 `application/wasm`（本地实测），多写一条没有收益。
 
-**待部署后完成（需要 `wrangler login`，或配置 API token）：**
-- 创建 D1 数据库；设置 `TOKEN_SECRET`；部署到 workers.dev。
-- 线上核实：SSR 页面的 CPU 时间；`/tsume` 被边缘缓存命中；wasm 的响应头；两条 WS 在线上可用。
+**线上验收（2026-09-27，https://shogi.wsyl1329.workers.dev ，D1 `shogi` 在 APAC）：**
+- `/`、`/board` 作为静态资源返回；`/board/` 307 到 `/board`。
+- `/tsume` 按请求渲染，**边缘缓存命中**：连续请求 `cf-cache-status: HIT`，`nowMs` 相同、`age` 递增，说明 Worker 没有再运行。
+- `/api/*` 为 `BYPASS` + `no-store`；wasm 为 `application/wasm` + `immutable`。
+- 两条 WebSocket 在线上可用：匹配 WS 收到 `queued`（`botAt` ≈ 30 秒后）、ping/pong 自动应答；房间 WS 用有效 token 能连上并按座位回显，伪造 token 被拒。
+- **CPU 实测**（`wrangler tail`）：`/tsume` 的 SSR 冷启动 23–30 ms、热 3–4 ms；`/api/health` 约 0–1 ms（墙钟约 250 ms，是 D1 的网络延迟）。冷启动超过免费档 10 ms 的上限，**上线前必须切到 Workers Paid**（§6.6）。
+- `TOKEN_SECRET` 已通过 `wrangler secret put` 设置（验收时轮换过一次，值从未落盘或打印）。
+
+**仍待处理：**
+- 账号切到 Workers Paid（上线前）。
 - 水匠权重的许可：仍无明确条款（见 §1.3-5 与 NOTICE.md），上线前再确认。
+- wasm 离线重建并比对 sha256（§1.3-4）。
+- CI 部署：配置 GitHub 仓库后，设置 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` secrets 和 `DEPLOY_ENABLED=true` 变量。
 
 ## 10. 验证方式
 

@@ -37,8 +37,7 @@
 		{
 			"binding": "DB",
 			"database_name": "shogi",
-			// database_id is added after `wrangler d1 create shogi` (first deploy);
-			// local dev and tests work without it.
+			"database_id": "d97c5cc4-e92d-42c2-a999-4e6f291d267f",
 			"migrations_dir": "migrations"
 		}
 	]

@@ -8,8 +8,8 @@
 
 import type { Counts, GameInput, GameMode, GameRecord, RecordMode, Summary } from './types'
 
-export const GAME_MODES: readonly GameMode[] = ['ai', 'board', 'online', 'bot']
-export const RECORD_MODES: readonly RecordMode[] = ['all', 'ai', 'online', 'board']
+export const GAME_MODES: readonly GameMode[] = ['ai', 'online', 'bot']
+export const RECORD_MODES: readonly RecordMode[] = ['all', 'ai', 'online']
 
 export function emptyCounts(): Counts {
   return { games: 0, wins: 0, losses: 0, draws: 0, eligible: 0 }
@@ -40,7 +40,7 @@ export function normalizeGame(input: GameInput): GameRecord {
   if (typeof input.id !== 'string' || !input.id || input.id.length > 200 || !GAME_MODES.includes(input.mode)) {
     throw new TypeError('Invalid game identity')
   }
-  if ((input.mode !== 'board' && !isPlayer(input.player)) || (input.winner !== null && !isPlayer(input.winner))) {
+  if (!isPlayer(input.player) || (input.winner !== null && !isPlayer(input.winner))) {
     throw new TypeError('Invalid game players')
   }
   if (!Array.isArray(input.moves) || !input.moves.every((m) => typeof m === 'string')) {
@@ -51,7 +51,7 @@ export function normalizeGame(input: GameInput): GameRecord {
     startedAt: input.startedAt,
     endedAt: input.endedAt,
     mode: input.mode,
-    player: input.mode === 'board' ? null : input.player,
+    player: input.player,
     winner: input.winner,
     reason: String(input.reason ?? ''),
     initialSfen: typeof input.initialSfen === 'string' && input.initialSfen ? input.initialSfen : null,
@@ -70,7 +70,7 @@ export function normalizeGame(input: GameInput): GameRecord {
 }
 
 export function gameCounts(game: GameRecord): Counts {
-  const eligible = game.mode !== 'board' && game.winner !== null
+  const eligible = game.winner !== null
   return {
     games: 1,
     wins: Number(eligible && game.winner === game.player),
@@ -158,16 +158,14 @@ export function reasonLabel(reason: string): string {
   return REASON_LABELS[reason] ?? '終局'
 }
 
-/** 勝ち / 負け / 引き分け — or, on the 将棋盤, which side won. */
+/** 勝ち / 負け / 引き分け. */
 export function resultLabel(game: GameRecord): string {
   if (game.winner === null) return '引き分け'
-  if (game.mode === 'board') return game.winner === 'sente' ? '先手の勝ち' : '後手の勝ち'
   return game.winner === game.player ? '勝ち' : '負け'
 }
 
-export function resultTone(game: GameRecord): 'win' | 'lose' | 'draw' | 'board' {
+export function resultTone(game: GameRecord): 'win' | 'lose' | 'draw' {
   if (game.winner === null) return 'draw'
-  if (game.mode === 'board') return 'board'
   return game.winner === game.player ? 'win' : 'lose'
 }
 
@@ -177,8 +175,6 @@ export function opponentLabel(game: GameRecord): string {
       return game.aiLevel ? `AI ${game.aiLevel}` : 'AI'
     case 'bot':
       return 'COM'
-    case 'board':
-      return '将棋盤'
     case 'online': {
       const name = game.opponentName || '匿名プレイヤー'
       return game.opponentRank ? `${name} ${game.opponentRank}` : name

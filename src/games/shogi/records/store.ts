@@ -5,6 +5,7 @@
 // by game id (the decision is made by core/records/model.ts planSave, the
 // summaries subtract the old version); tsume, backup/restore and the recording
 // start-time gate dropped. Never touches IndexedDB at import time.
+// Modified 2026-09-28: version 2 drops the games of the removed 将棋盤 mode.
 
 import {
   RECORD_MODES,
@@ -26,7 +27,7 @@ import type {
 } from '../core/records/types'
 
 const DB_NAME = 'sg-records'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 interface StoredGame extends GameRecord {
   modeGroup: Exclude<RecordMode, 'all'>
@@ -54,7 +55,11 @@ function database(): Promise<IDBDatabase> {
     }
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     let rejected = false
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
+      if (event.oldVersion >= 1) {
+        dropBoardGames(request.transaction!)
+        return
+      }
       const db = request.result
       const games = db.createObjectStore('games', { keyPath: 'id' })
       games.createIndex('byEndedAt', ['endedAt', 'id'])
@@ -98,6 +103,42 @@ function completed<T>(transaction: IDBTransaction, result: () => T): Promise<T> 
     transaction.onabort = () => reject(transaction.error || new Error('Could not save records'))
     transaction.onerror = () => {} // the abort handler reports it
   })
+}
+
+/**
+ * Version 2: the 将棋盤 mode was removed. Its games, their waza references and
+ * its summary go, and 「すべて」 is rebuilt from the games that remain.
+ */
+function dropBoardGames(transaction: IDBTransaction): void {
+  const games = transaction.objectStore('games')
+  const references = transaction.objectStore('gameWaza')
+  const summaries = transaction.objectStore('summaries')
+  summaries.delete('board')
+  const doomed = games.index('byMode').openCursor(IDBKeyRange.bound(['board'], ['board', []]))
+  let removed = 0
+  doomed.onsuccess = () => {
+    const cursor = doomed.result
+    if (cursor) {
+      const refs = references.index('byGame').getAllKeys((cursor.value as StoredGame).id)
+      refs.onsuccess = () => refs.result.forEach((key) => references.delete(key))
+      cursor.delete()
+      removed++
+      cursor.continue()
+      return
+    }
+    if (removed === 0) return
+    let all = emptySummary()
+    const rest = games.openCursor()
+    rest.onsuccess = () => {
+      const row = rest.result
+      if (!row) {
+        summaries.put({ mode: 'all', ...all })
+        return
+      }
+      all = updateSummary(all, 'all', null, withoutGroup(row.value as StoredGame))
+      row.continue()
+    }
+  }
 }
 
 function withoutGroup(stored: StoredGame): GameRecord {

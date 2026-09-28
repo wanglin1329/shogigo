@@ -25,8 +25,6 @@ export interface ShogiSettings {
   hideRank: boolean
   /** Spoken countdown on my own clock in timed online games. */
   byoyomi: Byoyomi
-  /** Board mode: turn the board toward the side to move after every move. */
-  boardAutoFlip: boolean
   /** 手筋・囲いの演出: 派手 / 標準 / 控えめ / なし. */
   wazaFx: WazaFxLevel
 }
@@ -41,7 +39,6 @@ export const DEFAULT_SETTINGS: ShogiSettings = {
   botFallback: true,
   hideRank: false,
   byoyomi: 'soft',
-  boardAutoFlip: false,
   wazaFx: 'std',
 }
 

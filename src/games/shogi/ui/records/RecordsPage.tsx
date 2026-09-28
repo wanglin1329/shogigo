@@ -14,7 +14,6 @@ const TABS: { mode: RecordMode; label: string }[] = [
   { mode: 'all', label: 'すべて' },
   { mode: 'ai', label: 'AI' },
   { mode: 'online', label: 'だれかと' },
-  { mode: 'board', label: '将棋盤' },
 ]
 
 export function isRecordMode(value: unknown): value is RecordMode {
@@ -136,19 +135,17 @@ export function RecordsPage({ tab, onTab }: { tab: RecordMode; onTab: (mode: Rec
             戦績を読み込めませんでした。ページを再読み込みしてください。
           </p>
         )}
-        {load.state === 'ready' && <Ready tab={tab} load={load} loadingMore={loadingMore} onMore={() => void showMore()} />}
+        {load.state === 'ready' && <Ready load={load} loadingMore={loadingMore} onMore={() => void showMore()} />}
       </section>
     </div>
   )
 }
 
 function Ready({
-  tab,
   load,
   loadingMore,
   onMore,
 }: {
-  tab: RecordMode
   load: Extract<Load, { state: 'ready' }>
   loadingMore: boolean
   onMore: () => void
@@ -177,20 +174,16 @@ function Ready({
           <dt>対局数</dt>
           <dd>{summary.games}</dd>
         </div>
-        {tab !== 'board' && (
-          <>
-            <div>
-              <dt>勝率</dt>
-              <dd>{rate === null ? '—' : `${rate}%`}</dd>
-            </div>
-            <div>
-              <dt>勝ち・負け</dt>
-              <dd>
-                {summary.wins}勝 {summary.losses}敗{summary.draws > 0 ? ` ${summary.draws}分` : ''}
-              </dd>
-            </div>
-          </>
-        )}
+        <div>
+          <dt>勝率</dt>
+          <dd>{rate === null ? '—' : `${rate}%`}</dd>
+        </div>
+        <div>
+          <dt>勝ち・負け</dt>
+          <dd>
+            {summary.wins}勝 {summary.losses}敗{summary.draws > 0 ? ` ${summary.draws}分` : ''}
+          </dd>
+        </div>
       </dl>
       <ol className="records-list">
         {games.map((game) => {

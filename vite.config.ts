@@ -30,7 +30,7 @@ export default defineConfig({
         // guide/index.html would duplicate guide.html (the canonical /guide).
         filter: (page) =>
           !isSsrOnly(page.path) && !isPublicFile(page.path) && (page.path === '/' || !page.path.endsWith('/')),
-        // `/board` → board.html (no trailing slash), matching wrangler's
+        // `/online` → online.html (no trailing slash), matching wrangler's
         // assets.html_handling = "auto-trailing-slash".
         autoSubfolderIndex: false,
         failOnError: true,

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2025~ Yuki Lab
 // Copyright 2026 the shogi project contributors
-// Modified 2026-09-27: modes are ai / board / online / bot (bot = COM fallback,
+// Modified 2026-09-27: modes are ai / online / bot (bot = COM fallback,
 // grouped with online); records keep `initialSfen`; waza are plain ids given by
 // the caller; saving is an upsert by game id; tsume and backup types dropped.
 
 export type RecordPlayer = 'sente' | 'gote'
 
 /** How the game was played. `bot` = COM game after the matchmaker found nobody. */
-export type GameMode = 'ai' | 'board' | 'online' | 'bot'
+export type GameMode = 'ai' | 'online' | 'bot'
 
 /** Tabs / summary buckets. `bot` games count under `online`. */
-export type RecordMode = 'all' | 'ai' | 'online' | 'board'
+export type RecordMode = 'all' | 'ai' | 'online'
 
 /** What a game mode hands over when a game has ended. */
 export interface GameInput {
@@ -20,8 +20,8 @@ export interface GameInput {
   startedAt: number
   endedAt: number
   mode: GameMode
-  /** The side the player had; null on the 将棋盤 (both sides are theirs). */
-  player: RecordPlayer | null
+  /** The side the player had. */
+  player: RecordPlayer
   /** null = draw (千日手 etc.). */
   winner: RecordPlayer | null
   /** checkmate / sennichite / perpetual_check / resign / timeout / disconnect … */
@@ -30,14 +30,14 @@ export interface GameInput {
   initialSfen: string | null
   /** USI moves from the start position, as the game ended. */
   moves: string[]
-  /** 'AI' / 'COM' / the opponent's shown name / '' on the 将棋盤. */
+  /** 'AI' / 'COM' / the opponent's shown name. */
   opponentName: string
   /** AI level label (入門 … 伝説3), AI mode only. */
   aiLevel?: string | null
   /** Opponent's 段級位 label, only when it was visible to the player. */
   opponentRank?: string | null
   opponentRating?: number | null
-  /** Waza the player showed (every side on the 将棋盤); duplicates are dropped. */
+  /** Waza the player showed; duplicates are dropped. */
   wazaIds?: readonly string[]
 }
 
@@ -46,7 +46,7 @@ export interface GameRecord {
   startedAt: number
   endedAt: number
   mode: GameMode
-  player: RecordPlayer | null
+  player: RecordPlayer
   winner: RecordPlayer | null
   reason: string
   initialSfen: string | null
@@ -63,7 +63,7 @@ export interface Counts {
   wins: number
   losses: number
   draws: number
-  /** Denominator of the win rate: excludes the 将棋盤 and draws. */
+  /** Denominator of the win rate: excludes draws. */
   eligible: number
 }
 

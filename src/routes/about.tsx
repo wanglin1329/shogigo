@@ -11,7 +11,7 @@ export const Route = createFileRoute('/about')({
       {
         path: '/about',
         title: `運営者情報｜${SITE_NAME}`,
-        description: `${SITE_NAME}の運営者とサイトの概要です。ブラウザで指せる将棋サイトとして、AIとの対局、オンライン対局、ふたりで使える将棋盤を提供しています。`,
+        description: `${SITE_NAME}の運営者とサイトの概要です。ブラウザで指せる将棋サイトとして、AIとの対局とオンライン対局、将棋のルール入門を提供しています。`,
       },
       [breadcrumb([{ name: SITE_NAME, path: '/' }, { name: '運営者情報', path: '/about' }])],
     ),
@@ -34,7 +34,7 @@ function About() {
           <Link to="/online">だれかと対局</Link>：オンラインで知らない相手や友だちと指せます
         </li>
         <li>
-          <Link to="/board">将棋盤</Link>：1台の端末をふたりで囲んで指せます
+          <Link to="/guide">将棋のルール入門</Link>：盤と駒から反則、棋譜の読み方まで、図を使って8章で解説しています
         </li>
       </ul>
       <p>

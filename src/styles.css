@@ -2,7 +2,7 @@
 /* Feature stylesheets (one per area, so parallel work does not collide). */
 @import './styles/waza.css';
 @import './styles/records.css';
-@import './styles/board-mode.css';
+@import './styles/kifu-import.css';
 @import './styles/site.css';
 @import './styles/polish.css';
 @import './styles/guide.css';

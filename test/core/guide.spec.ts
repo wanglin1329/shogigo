@@ -46,7 +46,7 @@ function diagrams(c: Chapter): Diagram[] {
   return [c.hero, ...c.sections.flatMap((s) => s.blocks.flatMap((b) => (b.kind === 'figures' ? [...b.diagrams] : [])))]
 }
 
-const ROUTES = new Set(['/', '/board', '/online', '/records', '/guide', ...CHAPTERS.map((c) => `/guide/${c.slug}`)])
+const ROUTES = new Set(['/', '/online', '/records', '/guide', ...CHAPTERS.map((c) => `/guide/${c.slug}`)])
 
 function checkSearchCopy(metaTitle: string, description: string, lead: string) {
   expect(metaTitle).toContain('｜')

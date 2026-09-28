@@ -193,7 +193,7 @@ export function HomeGuide() {
       </ul>
       <p>
         人と指してみたくなったら、<Link to="/online">オンラインでだれかと対局</Link>
-        するか、目の前の相手とは<Link to="/board">1台の端末で使える将棋盤</Link>をどうぞ。
+        してみましょう。友だちとは招待リンクで指せます。
       </p>
 
       <h2>よくある質問</h2>

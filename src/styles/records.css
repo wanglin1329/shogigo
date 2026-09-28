@@ -119,8 +119,7 @@ a.records-row:hover {
   background: var(--bad-bg);
   color: var(--bad-fg);
 }
-.records-draw,
-.records-board {
+.records-draw {
   background: var(--sunken);
   color: var(--ink-soft);
 }

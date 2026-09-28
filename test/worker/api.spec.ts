@@ -76,7 +76,7 @@ describe('routing', () => {
   })
 
   it('non-API paths fall through to the page handler with no-store by default', async () => {
-    const res = await get('/board')
+    const res = await get('/online')
     expect(await res.text()).toBe('tanstack page')
     expect(res.headers.get('Cache-Control')).toBe('no-store')
   })

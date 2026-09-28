@@ -8,7 +8,7 @@
 
 ## 0. 目标与原则
 
-- **首页 `/` 就是可玩的将棋（对 AI）**，与参考站一致；另有 `/board/`（一台设备两人对局）、`/online/`（联机）。
+- **首页 `/` 就是可玩的将棋（对 AI）**，与参考站一致；另有 `/online/`（联机）、`/guide`（规则入门）。（两人同机的 `/board` 曾经做过，2026-09-28 移除，见 §9.11）
 - **将来还会加其他棋类、牌类游戏**：架构按「多游戏站」设计，但首发只做将棋，不为还不存在的游戏预先抽象（§2.4）。
 - **前端 React 重写**；**AI 与参考站用同一套引擎文件与参数**（同一个 やねうら王 wasm + 同一个 JS AI，11 档参数相同，棋力相当；细节见 §5.1）。
 - **联机用 Cloudflare Workers + Durable Objects**。
@@ -28,7 +28,7 @@
 | **D4** | 匹配等不到人时切 COM 的秒数 | **30 秒**（服务端 `BOT_FALLBACK_SECONDS`，可配）。上游把「等 60 秒才发 ticket」当作 COM 局限流的一环，改 30 秒后这个上限翻倍；每日 20 局上限不变。P3 移植时同步改注释、假设和测试（`matchmaker.ts:343`） |
 | **D2** | 品牌名 / 域名 | **shogigo / `shogigo.com`**（2026-09-27 在 Cloudflare Registrar 注册）。不用「参考站」及其 logo |
 | **D5** | 统计 / 广告 | **首发只上 Plausible**（与其他站同一个自建实例，脚本地址走环境变量，没配就不加载）。不放广告和广告位，隐私政策也不写 AdSense；以后要加时再改隐私政策 |
-| **D6** | 运营者 / 联系方式 / 源码 | 运营者「shogigo運営事務局」；联系邮箱 `hi@shogigo.com`（走配置，空则お問い合わせ页 404；需在 Cloudflare Email Routing 转发）；源码：公开仓库 `github.com/wanglin1329/shogi`（网站链接指向这里）；日常开发推送到私有仓库 `github.com/wanglin1329/shigigo`（git 的 origin）。域名在 P5a 完成后再绑定 |
+| **D6** | 运营者 / 联系方式 / 源码 | 运营者「shogigo運営事務局」；联系邮箱 `hi@shogigo.com`（走配置，空则お問い合わせ页 404；需在 Cloudflare Email Routing 转发）；源码：公开仓库 `github.com/wanglin1329/shogigo`（网站链接指向这里）；日常开发推送到私有仓库 `github.com/wanglin1329/shigigo`（git 的 origin）。域名在 P5a 完成后再绑定 |
 | **D7** | 水匠 Petite 评价函数 | **按现状分发，不单独向作者确认**（用户 2026-09-27 决定，已知有一定权利风险）。与参考站、mizar 的 GPL 发布包做法相同；在 `/license` 和 NOTICE 里写明出处（たややん）。调查过程：mizar/YaneuraOu.wasm 的 README 与发布页、やねうら王官网的水匠5 单体发布公告、`yaneurao/YaneuraOu` 的 suisho5 发布页，都没有写明许可条款 |
 | **D3** | 框架与部署 | **TanStack Start 官方 Cloudflare 起步方式（MIT）**：`@cloudflare/vite-plugin` 构建，部署到一个 Worker。页面、`/api/*`、DO、D1 同源。不用 ShipAny：它的协议禁止公开源码，与 D1 冲突；而且支付、积分、RBAC 等功能都用不上 |
 
@@ -120,7 +120,7 @@ GPL 是「分发时生效」：
 ├─ migrations/                  D1（从上游移植，按功能裁剪）
 ├─ src/
 │  ├─ server.ts                 Worker 入口：导出 DO；联机路由优先，其余交给 TanStack
-│  ├─ routes/                   TanStack 文件路由：/、/board、/online、/records、/tsume、/waza/…、法务页
+│  ├─ routes/                   TanStack 文件路由：/、/online、/records、/tsume、/waza/…、法务页
 │  ├─ site/                     全站共用：页头页脚、布局、SEO 辅助、广告位、统计、法务文案
 │  ├─ games/
 │  │  └─ shogi/
@@ -717,11 +717,11 @@ M1 的验收**只盯四件事**：完整的 AI 对局、友达对战、随机匹
 
 **7. 上线验收清单**（绑域名，要用户确认后执行）
 - [ ] Workers Paid
-- [x] 源码仓库已公开（`github.com/wanglin1329/shogi`，2026-09-28 首次推送），`/license` 的链接能打开
+- [x] 源码仓库已公开（`github.com/wanglin1329/shogigo`，2026-09-28 重建后推送），`/license` 的链接能打开
 - [ ] 公开仓库何时同步由用户决定：**只有用户明确说「推公开仓库」时才推送**，部署时不自动推送
 - [ ] `hi@shogigo.com` 能收到信（Email Routing）
 - [ ] wrangler `routes` 加入 `shogigo.com` 的 custom domain；`www` 用 Cloudflare **Redirect Rule** 301 到裸域名。静态页面不经过 Worker，所以不能在 Worker 里做跳转
-- [ ] 两个主机名的证书都已生效；`/`、`/board`、`/online`、带查询参数的 URL、`www` 跳转都实测过
+- [ ] 两个主机名的证书都已生效；`/`、`/online`、`/guide`、带查询参数的 URL、`www` 跳转都实测过
 - [ ] 正式域名下的 canonical / OG / sitemap / robots 都正确；不存在的路径返回 404
 - [ ] `workers_dev: false`
 - [ ] HSTS 在确认两个主机名的 HTTPS 都没问题后再开（可以晚于上线）
@@ -1033,6 +1033,15 @@ interface Section {
     - 跨标签页同步（监听 `storage` 事件）。
   - NIT 全部修正：目录底色 `--toc-bg`（浅色恢复原来的半透明白）；盘上格线 `--sq-line` 和 `--thumb-line`；深色下的禁用文字调亮。
 - 实测：预渲染的 `index.html` 里主题脚本位于 `<head>`；选择后刷新、切换页面都会保留；两种主题的手机端和桌面端都截图确认过（对局、大厅、规则入门的局面图、设置、导入、结果弹窗、战绩）。
+
+## 9.11 移除将棋盘页（2026-09-28）
+
+用户判断 `/board`（一台设备两人对局）没有必要，已整体移除：
+- 删除：页面、组件 `BoardMode`、正文 `content/board.tsx`、OG 图，以及只给它用的设置「毎手、手番の側から見る」（`boardAutoFlip`）和 `GameMeta.imported`。
+- 战绩：去掉「将棋盤」标签页和 `board` 模式（`GameMode` / `RecordMode`），`player` 改为必填。战绩库（IndexedDB `sg-records`）升到 v2：打开时删掉旧的将棋盘对局、它们的技引用和 `board` 汇总，并按剩下的对局重算「すべて」。
+- 链接：模式标签、首页、联机页、运营者信息页、规则入门第 1 / 5 / 6 / 8 章里指向它的说明都已改写；sitemap、构建检查、文案测试都已同步。
+- 「棋譜を読み込む」的样式仍给 AI 模式用，文件改名为 `styles/kifu-import.css`。
+- 上面各节（§9.4、§9.6、§9.9 等）里关于 `/board` 的记述保留当时的原样，不再更新。
 
 ## 10. 验证方式
 

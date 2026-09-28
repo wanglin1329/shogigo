@@ -57,12 +57,8 @@ describe('normalizeGame', () => {
     expect(() => normalizeGame(input({ endedAt: T0 - 1 }))).toThrow(TypeError)
     expect(() => normalizeGame(input({ id: '' }))).toThrow(TypeError)
     expect(() => normalizeGame(input({ mode: 'friend' as never }))).toThrow(TypeError)
-    expect(() => normalizeGame(input({ player: null }))).toThrow(TypeError)
+    expect(() => normalizeGame(input({ player: null as never }))).toThrow(TypeError)
     expect(() => normalizeGame(input({ winner: 'nobody' as never }))).toThrow(TypeError)
-  })
-
-  it('the 将棋盤 has no player side', () => {
-    expect(game({ mode: 'board', player: 'sente' }).player).toBeNull()
   })
 
   it('keeps the AI level only in AI mode, the opponent rank only online', () => {
@@ -83,11 +79,10 @@ describe('counts and summaries', () => {
     expect(modeGroup('ai')).toBe('ai')
   })
 
-  it('draws and the 将棋盤 are not in the win-rate denominator', () => {
+  it('draws are not in the win-rate denominator', () => {
     expect(gameCounts(game())).toEqual({ games: 1, wins: 1, losses: 0, draws: 0, eligible: 1 })
     expect(gameCounts(game({ winner: 'gote' }))).toEqual({ games: 1, wins: 0, losses: 1, draws: 0, eligible: 1 })
     expect(gameCounts(game({ winner: null }))).toEqual({ games: 1, wins: 0, losses: 0, draws: 1, eligible: 0 })
-    expect(gameCounts(game({ mode: 'board', winner: 'sente' }))).toEqual({ games: 1, wins: 0, losses: 0, draws: 0, eligible: 0 })
   })
 
   it('adds and removes a game, per waza too, without mutating the input', () => {
@@ -162,14 +157,12 @@ describe('labels', () => {
     expect(opponentLabel(game({ mode: 'bot', opponentName: 'COM' }))).toBe('COM')
     expect(opponentLabel(game({ mode: 'online', opponentName: 'taro', opponentRank: '5級' }))).toBe('taro 5級')
     expect(opponentLabel(game({ mode: 'online', opponentName: '' }))).toBe('匿名プレイヤー')
-    expect(opponentLabel(game({ mode: 'board' }))).toBe('将棋盤')
   })
 
   it('result and reason', () => {
     expect(resultLabel(game())).toBe('勝ち')
     expect(resultLabel(game({ winner: 'gote' }))).toBe('負け')
     expect(resultLabel(game({ winner: null }))).toBe('引き分け')
-    expect(resultLabel(game({ mode: 'board', winner: 'gote' }))).toBe('後手の勝ち')
     expect(reasonLabel('perpetual_check')).toBe('連続王手の千日手')
     expect(reasonLabel('whatever')).toBe('終局')
   })

@@ -11,7 +11,7 @@
 	"main": "src/server.ts",
 	"assets": {
 		// Prerendered pages are written as `<path>.html` (autoSubfolderIndex: false),
-		// so `/board` is served from board.html and `/board/` 307s to `/board`.
+		// so `/online` is served from online.html and `/online/` 307s to `/online`.
 		"html_handling": "auto-trailing-slash"
 	},
 	// Workers Caching: cached Worker responses are served without running the

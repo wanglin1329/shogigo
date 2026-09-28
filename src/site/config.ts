@@ -32,7 +32,7 @@ function httpsUrlOrEmpty(name: string, value: string | undefined): string {
   return trimmed
 }
 
-/** Absolute URL for a site path ('/' or '/board'; never a trailing slash). */
+/** Absolute URL for a site path ('/' or '/online'; never a trailing slash). */
 export function absoluteUrl(path: string): string {
   return path === '/' ? `${SITE_URL}/` : `${SITE_URL}${path}`
 }

@@ -6,8 +6,6 @@ import { readJson, writeJson } from '../../../../site/storage'
 export interface GameMeta {
   id: string
   startedAt: number
-  /** 将棋盤: an imported kifu nobody has moved in yet (it is not a game to resign or record). */
-  imported?: boolean
 }
 
 export function newGameMeta(): GameMeta {

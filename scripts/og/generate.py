@@ -7,7 +7,7 @@ Run on macOS (Avenir Next for the latin wordmark):
 
 Downloads Shippori Mincho B1 ExtraBold (SIL OFL 1.1) into scripts/og/.cache/
 on first run. Writes into public/: favicon-32.png, apple-touch-icon.png,
-logo-512.png and og/{home,board,online}.jpg. The outputs are committed; CI
+logo-512.png and og/{guide,home,online}.jpg. The outputs are committed; CI
 never runs this. public/favicon.svg is hand-written (same drawing as PieceMark
 in src/site/SiteChrome.tsx).
 """
@@ -116,17 +116,6 @@ POSITIONS = {
         ". 角 金 . . . . 飛 .",
         "香 桂 銀 . 玉 金 銀 桂 香",
     ],
-    "board": [
-        "v香 v桂 v銀 v金 v玉 v金 v銀 v桂 v香",
-        ". v飛 . . . . . v角 .",
-        "v歩 v歩 v歩 v歩 v歩 v歩 v歩 v歩 v歩",
-        ". . . . . . . . .",
-        ". . . . . . . . .",
-        ". . . . . . . . .",
-        "歩 歩 歩 歩 歩 歩 歩 歩 歩",
-        ". 角 . . . . . 飛 .",
-        "香 桂 銀 金 玉 金 銀 桂 香",
-    ],
     # A 中飛車 vs 居飛車 middle game.
     "online": [
         "v香 v桂 . v金 . . . v桂 v香",
@@ -144,7 +133,6 @@ POSITIONS = {
 COPY = {
     "guide": ("ルール入門", "駒の動きから反則まで、8章で図解"),
     "home": ("AIと対局", "入門から伝説3まで、11段階の強さ"),
-    "board": ("将棋盤", "1台の端末で、ふたりで指す"),
     "online": ("オンライン対局", "全国の相手や友だちと"),
 }
 

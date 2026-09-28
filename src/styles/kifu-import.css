@@ -33,9 +33,3 @@
   background: var(--good-bg);
   font-size: 13px;
 }
-
-/* ------------------------------------------------------------------ board mode */
-.board-autoflip {
-  min-height: 44px;
-  font-size: 13px;
-}

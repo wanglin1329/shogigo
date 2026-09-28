@@ -40,7 +40,6 @@ const publicEnv = parseEnv(readFileSync('env/.env', 'utf8'))
 const contactEmail = publicEnv.VITE_CONTACT_EMAIL?.trim() ?? ''
 for (const page of [
   '/index.html',
-  '/board.html',
   '/online.html',
   '/records.html',
   '/about.html',

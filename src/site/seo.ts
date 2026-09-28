@@ -51,7 +51,7 @@ export function pageHead(seo: PageSeo, jsonLd: readonly object[] = []) {
   }
 }
 
-/** 「shogigo › 将棋盤」 as structured data. */
+/** 「shogigo › ルール入門」 as structured data. */
 export function breadcrumb(items: readonly { name: string; path: string }[]) {
   return {
     '@context': 'https://schema.org',

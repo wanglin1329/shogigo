@@ -1,6 +1,6 @@
 # shogi
 
-ブラウザで遊べる将棋サイト（AI 対戦・将棋盤・通信対戦）。TanStack Start + Cloudflare Workers（Durable Objects / D1）。
+ブラウザで遊べる将棋サイト（AI 対戦・通信対戦・ルール入門）。TanStack Start + Cloudflare Workers（Durable Objects / D1）。
 
 GPL-3.0-only。第三者コンポーネントについては [NOTICE.md](NOTICE.md)。
 

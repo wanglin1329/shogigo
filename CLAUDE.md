@@ -21,7 +21,7 @@
 - 評価の書き込みは D1 バッチ内で版（対局数）を確認する楽観的並行制御。読んでから書く形に戻さない（並行結算で上書き・上限すり抜けが起きる）
 - 段級位を隠した人の評価・段位は受け手ごとに消す（`redactRatings`）。MatchPayload を全員に同じ物を送らない
 - 技演出（`WazaEffect`）の出し入れは上流 `maybeShowWaza` と同じ規則。**相手の着手では消さない**（AI は 1 秒以内に応手するので、消すと演出が見えない）。`trigger` は実際に指した時だけ変わる値（盤のアニメ id）を渡す
-- 対局記録は同じ id で保存し直すと上書き。id は AI・将棋盤が `GameMeta`（localStorage）、通信対戦が `部屋コード:created_at`（部屋コードは期限切れ後に再利用される）。新しい対局を始める処理では必ず新しい `GameMeta` を作る
+- 対局記録は同じ id で保存し直すと上書き。id は AI 対局が `GameMeta`（localStorage）、通信対戦が `部屋コード:created_at`（部屋コードは期限切れ後に再利用される）。新しい対局を始める処理では必ず新しい `GameMeta` を作る
 - 公開設定（サイトURL・問い合わせ先・ソースURL・Plausible）は入庫している `env/.env`（Vite `envDir`）。**公開値だけ**。秘密値を入れない
 - ゲームページの文案は `src/content/*.tsx`。字数・句点位置・禁用词は `test/core/copy.spec.ts` が検査する。事実（強さの段階、千日手、30秒/60秒など）はコードで確かめてから書く。**文案を直したら同じコミットで `src/content/lastmod.ts` の日付も直す**（sitemap の lastmod はここだけが出どころ。`new Date()` 禁止）
 - 新しい公開ページは `LASTMOD` に足す（sitemap に入る）。sitemap.xml / robots.txt は server route をビルド時に静的化（`vite.config.ts` の `pages`）
@@ -33,6 +33,6 @@
 - 「本作では」と書く事実は必ずコードで確かめる。一般ルールは日本将棋連盟の対局規則に合わせる（入玉宣言の点数条件は未確認なので書いていない）
 - `src/styles/*.css` は `styles.css` の先頭で `@import` されるので、同じ詳細度なら styles.css 本体のルールが勝つ。上書きしたいときは詳細度を上げる（`desktop.css` は `body .game`）
 - 対局画面の3つの包み（`game-top` / `game-main` / `game-bottom`）は、スマホでは `display: contents`、1024px 以上で2カラムのグリッドになる。対局画面に要素を足すときは、どの包みに入れるかを決める
-- リモート：`origin` は非公開の `wanglin1329/shigigo`（普段の push 先）。公開リポジトリは `wanglin1329/shogi`（サイトの GitHub リンク先）。**公開リポジトリへの push はユーザーが明示的に指示したときだけ**（デプロイのついでに push しない）
+- リモート：`origin` は非公開の `wanglin1329/shigigo`（普段の push 先）。公開リポジトリは `wanglin1329/shogigo`（サイトの GitHub リンク先）。**公開リポジトリへの push はユーザーが明示的に指示したときだけ**（デプロイのついでに push しない）
 - 本番の D1 は変更のたびに `wrangler d1 migrations apply shogi --remote` を先に
 - ポート: dev 3160 / preview 3161（3100・3101 はユーザー用）

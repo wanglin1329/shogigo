@@ -5,7 +5,6 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { BOARD_COPY } from '../../src/content/board'
 import { HOME_COPY } from '../../src/content/home'
 import { LASTMOD } from '../../src/content/lastmod'
 import { ONLINE_COPY } from '../../src/content/online'
@@ -13,7 +12,7 @@ import type { PageCopy } from '../../src/content/types'
 import { absoluteUrl } from '../../src/site/config'
 import { robotsTxt, sitemapEntries, sitemapXml } from '../../src/site/sitemap'
 
-const PAGES: Record<string, PageCopy> = { '/': HOME_COPY, '/board': BOARD_COPY, '/online': ONLINE_COPY }
+const PAGES: Record<string, PageCopy> = { '/': HOME_COPY, '/online': ONLINE_COPY }
 const BANNED = ['登録', 'ダウンロード', 'インストール']
 /** Characters counted like the SERP does: every code point is one. */
 const len = (s: string) => [...s].length
@@ -70,7 +69,7 @@ describe('copy across pages', () => {
 describe('sitemap and robots', () => {
   it('canonical URLs have no trailing slash (except the home page)', () => {
     expect(absoluteUrl('/')).toMatch(/\/$/)
-    expect(absoluteUrl('/board')).not.toMatch(/\/$/)
+    expect(absoluteUrl('/online')).not.toMatch(/\/$/)
   })
 
   it('lists every dated page with its own date, and nothing else', () => {

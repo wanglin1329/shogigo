@@ -29,7 +29,7 @@
 | **D4** | 匹配等不到人时切 COM 的秒数 | **30 秒**（服务端 `BOT_FALLBACK_SECONDS`，可配）。上游把「等 60 秒才发 ticket」当作 COM 局限流的一环，改 30 秒后这个上限翻倍；每日 20 局上限不变。P3 移植时同步改注释、假设和测试（`matchmaker.ts:343`） |
 | **D2** | 品牌名 / 域名 | **shogigo / `shogigo.com`**（2026-09-27 在 Cloudflare Registrar 注册）。不用「参考站」及其 logo |
 | **D5** | 统计 / 广告 | **首发只上 Plausible**（与其他站同一个自建实例，脚本地址走环境变量，没配就不加载）。不放广告和广告位，隐私政策也不写 AdSense；以后要加时再改隐私政策 |
-| **D6** | 运营者 / 联系方式 / 源码 | 运营者「shogigo運営事務局」；联系邮箱 `hi@shogigo.com`（走配置，空则お問い合わせ页 404；需在 Cloudflare Email Routing 转发）；源码仓库 `github.com/wanglin1329/shigigo`（上线时改为公开）。域名在 P5a 完成后再绑定 |
+| **D6** | 运营者 / 联系方式 / 源码 | 运营者「shogigo運営事務局」；联系邮箱 `hi@shogigo.com`（走配置，空则お問い合わせ页 404；需在 Cloudflare Email Routing 转发）；源码：公开仓库 `github.com/wanglin1329/shogi`（网站链接指向这里）；日常开发推送到私有仓库 `github.com/wanglin1329/shigigo`（git 的 origin）。域名在 P5a 完成后再绑定 |
 | **D7** | 水匠 Petite 评价函数 | **按现状分发，不单独向作者确认**（用户 2026-09-27 决定，已知有一定权利风险）。与参考站、mizar 的 GPL 发布包做法相同；在 `/license` 和 NOTICE 里写明出处（たややん）。调查过程：mizar/YaneuraOu.wasm 的 README 与发布页、やねうら王官网的水匠5 单体发布公告、`yaneurao/YaneuraOu` 的 suisho5 发布页，都没有写明许可条款 |
 | **D3** | 框架与部署 | **TanStack Start 官方 Cloudflare 起步方式（MIT）**：`@cloudflare/vite-plugin` 构建，部署到一个 Worker。页面、`/api/*`、DO、D1 同源。不用 ShipAny：它的协议禁止公开源码，与 D1 冲突；而且支付、积分、RBAC 等功能都用不上 |
 
@@ -718,7 +718,8 @@ M1 的验收**只盯四件事**：完整的 AI 对局、友达对战、随机匹
 
 **7. 上线验收清单**（绑域名，要用户确认后执行）
 - [ ] Workers Paid
-- [ ] 源码仓库已公开，`/license` 的链接能打开
+- [x] 源码仓库已公开（`github.com/wanglin1329/shogi`，2026-09-28 首次推送），`/license` 的链接能打开
+- [ ] ⚠️ GPL：线上分发的版本，其源码必须能从公开仓库取得。部署新版本时，要把相同的提交也推送到公开仓库（日常推送到私有的 origin 时容易漏掉）
 - [ ] `hi@shogigo.com` 能收到信（Email Routing）
 - [ ] wrangler `routes` 加入 `shogigo.com` 的 custom domain；`www` 用 Cloudflare **Redirect Rule** 301 到裸域名。静态页面不经过 Worker，所以不能在 Worker 里做跳转
 - [ ] 两个主机名的证书都已生效；`/`、`/board`、`/online`、带查询参数的 URL、`www` 跳转都实测过
@@ -775,7 +776,7 @@ M1 的验收**只盯四件事**：完整的 AI 对局、友达对战、随机匹
 
 **上线前剩下的**（§9.5-7，需要用户操作或确认）：
 - Workers Paid；
-- 源码仓库改为公开；
+- 部署新版本时同步推送到公开仓库（GPL 的对应源码）；
 - `hi@` 的 Email Routing；
 - 在 Plausible 里给本站建站点，把脚本地址填进 `VITE_PLAUSIBLE_SRC`，并同时更新 `/privacy` 的日期；
 - 绑定 custom domain，`www` 用 Redirect Rule 跳转；

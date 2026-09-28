@@ -7,6 +7,7 @@ import { parseUsiMove } from '../core/kifu/moves'
 import { currentState, openRecord, play, resign, seek, visibleOutcome } from '../core/record'
 import type { GameRecord, GameView } from '../core/record'
 import { gameWaza } from '../core/waza/tracker'
+import { IconChevronLeft, IconChevronRight, IconClose, IconFlip } from '../../../site/icons'
 import { writeJson } from '../../../site/storage'
 import { Modal } from '../../../site/Modal'
 import type { MoveAnimation } from './Board'
@@ -202,7 +203,7 @@ export function BoardMode() {
           aria-pressed={settings.flipped}
           onClick={() => changeSettings({ ...settings, flipped: !settings.flipped })}
         >
-          ⇅
+          <IconFlip />
         </button>
       </div>
 
@@ -232,7 +233,7 @@ export function BoardMode() {
 
       <div className="controls">
         <button type="button" className="btn btn-step" aria-label="一手戻る" disabled={view.cursor === 0} onClick={() => goTo(view.cursor - 1)}>
-          ＜
+          <IconChevronLeft />
         </button>
         <button
           type="button"
@@ -241,7 +242,7 @@ export function BoardMode() {
           disabled={view.cursor === view.record.moves.length}
           onClick={() => goTo(view.cursor + 1)}
         >
-          ＞
+          <IconChevronRight />
         </button>
         <button type="button" className="btn btn-primary" onClick={() => newGame()}>
           新規対局
@@ -281,7 +282,7 @@ export function BoardMode() {
             元に戻す
           </button>
           <button type="button" className="icon-button" aria-label="閉じる" onClick={() => setResetUndo(null)}>
-            ✕
+            <IconClose />
           </button>
         </div>
       )}

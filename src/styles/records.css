@@ -43,7 +43,7 @@
 }
 .records-tab[aria-selected='true'] {
   background: var(--card);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  box-shadow: 0 1px 3px rgb(var(--shadow-rgb) / 0.15);
 }
 .records-panel {
   display: grid;

@@ -7,6 +7,7 @@ import { buildNotation } from '../core/kifu/notation'
 import type { NotationEntry } from '../core/kifu/notation'
 import { encodeKifuParam } from '../core/kifu/url'
 import type { GameView } from '../core/record'
+import { IconChevronRight } from '../../../site/icons'
 import { lineShareUrl, openExternal, xShareUrl } from '../../../site/share'
 
 export function shareUrl(view: GameView): string | null {
@@ -92,7 +93,7 @@ export function KifuBar({
     <section className={`kifu ${open ? 'kifu-open' : ''}`}>
       <button type="button" className="kifu-summary" aria-expanded={open} onClick={onToggle}>
         <span className="kifu-caret" aria-hidden="true">
-          {open ? '▾' : '▸'}
+          <IconChevronRight size={14} />
         </span>
         <span className="kifu-title">棋譜</span>
         <span className="kifu-current">{current ? `${current.ply}手目 ${current.text}` : '開始局面'}</span>

@@ -11,7 +11,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { name: 'theme-color', content: '#f6f1e7' },
+      { name: 'theme-color', content: '#f4efe4' },
       // Fallback (e.g. the 404 page); every route sets its own.
       { title: SITE_NAME },
     ],
@@ -62,8 +62,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <a className="skip-link" href="#content">
+          本文へスキップ
+        </a>
         <SiteHeader />
-        {children}
+        <div id="content" tabIndex={-1}>
+          {children}
+        </div>
         <SiteFooter />
         <Scripts />
       </body>

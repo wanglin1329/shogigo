@@ -4,7 +4,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 960px;
+  /* Same column as the text below, so the logo lines up with the content. */
+  max-width: 720px;
   height: 48px;
   margin: 0 auto;
   padding: 0 16px;
@@ -36,7 +37,7 @@
 }
 
 .site-footer {
-  max-width: 960px;
+  max-width: 720px;
   margin: 48px auto 0;
   padding: 24px 16px 32px;
   border-top: 1px solid #e3d8c3;

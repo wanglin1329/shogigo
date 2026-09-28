@@ -27,7 +27,7 @@ export function SiteHeader() {
         </span>
       </Link>
       <nav className="site-header-nav" aria-label="サイト">
-        <Link to="/records" className="site-header-link">
+        <Link to="/records" className="site-header-link" activeProps={{ 'aria-current': 'page' }}>
           戦績
         </Link>
       </nav>

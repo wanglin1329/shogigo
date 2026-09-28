@@ -27,5 +27,6 @@
 - 新しい公開ページは `LASTMOD` に足す（sitemap に入る）。sitemap.xml / robots.txt は server route をビルド時に静的化（`vite.config.ts` の `pages`）
 - workers.dev は noindex（静的ファイルは `public/_headers` のホスト指定、Worker の応答は `server.ts`）。独自ドメイン確定後は `workers_dev: false`
 - OG 画像・アイコンは `scripts/og/generate.py` で作って入庫（CI では作らない）
+- 配色は暖色系のみ、アクセントは朱（`--shu` / `--shu-deep`）の1色。灰色は `--ink-soft`、影は `--shadow-rgb`（紙の色味）で、`rgb(0 0 0 / …)` や寒色の灰を持ち込まない。アイコンは `src/site/icons.tsx`（⚙✕▸ などの文字で代用しない）
 - 本番の D1 は変更のたびに `wrangler d1 migrations apply shogi --remote` を先に
 - ポート: dev 3160 / preview 3161（3100・3101 はユーザー用）

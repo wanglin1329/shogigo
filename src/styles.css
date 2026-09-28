@@ -4,6 +4,7 @@
 @import './styles/records.css';
 @import './styles/board-mode.css';
 @import './styles/site.css';
+@import './styles/polish.css';
 
 /* Piece glyphs only: a subset of Shippori Mincho B1 (SIL OFL 1.1, public/fonts/OFL.txt).
    Self-hosted so that no page load contacts a third party (docs/PLAN.md §9.5-4). */
@@ -21,40 +22,51 @@
 
 body {
   margin: 0;
-  background: #f6f1e7;
-  color: #2b2118;
   font-family:
     system-ui,
     -apple-system,
     'Hiragino Sans',
     'Noto Sans JP',
     sans-serif;
+  /* Clocks, ratings, counts and board coordinates line up. */
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------------ tokens */
 :root {
   --paper: #f4efe4;
   --card: #fffdf8;
-  --ink: #22262e;
-  --ink-soft: #5d616b;
+  /* Warm ink and grays only: they sit on warm paper (no cool grays). */
+  --ink: #2a231c;
+  --ink-soft: #6b6156;
+  --line: #ddd0b6;
   --wood-hi: #ecca8e;
   --wood-lo: #d7a95f;
   --grid-line: #7a5a33;
   --frame: #5e4122;
   --tray: #d3b27a;
   --tray-edge: #9c7a45;
+  /* The one accent. --shu-deep: links, hover, focus ring. */
   --shu: #b3392d;
+  --shu-deep: #8e2c22;
   --gold: #e6b12f;
-  --focus: #2f6fd6;
+  --focus: var(--shu-deep);
+  /* Shadows carry the paper's hue, never plain black. */
+  --shadow-rgb: 60 36 10;
   --piece-face: #fbf1d6;
   --piece-edge: #b99357;
   /* One cell of the board; everything on the board scales from it. */
   --cell: clamp(30px, calc((100vw - 32px - 18px) / 9), 50px);
   --piece-font: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  /* Page headings: the system mincho (nothing to download), as on a printed board-game guide. */
+  --display-font: 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho', 'Noto Serif JP', serif;
 }
 
 body {
-  background: var(--paper);
+  /* Washi: a faint paper grain instead of a flat fill. */
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .32 0 0 0 0 .18 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    var(--paper);
   color: var(--ink);
 }
 
@@ -124,14 +136,13 @@ body {
   border-radius: 999px;
   background: transparent;
   color: var(--ink);
-  font-size: 20px;
   cursor: pointer;
 }
 .icon-button:hover {
-  background: rgb(0 0 0 / 0.06);
+  background: rgb(var(--shadow-rgb) / 0.06);
 }
 .icon-button[aria-pressed='true'] {
-  background: rgb(0 0 0 / 0.1);
+  background: rgb(var(--shadow-rgb) / 0.1);
 }
 
 .board-area {
@@ -163,7 +174,7 @@ body {
   min-width: 3.2em;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgb(0 0 0 / 0.12);
+  background: rgb(var(--shadow-rgb) / 0.12);
   color: #3a2a14;
   font-size: 12px;
   font-weight: 700;
@@ -184,7 +195,8 @@ body {
 }
 .hand-empty {
   font-size: 12px;
-  color: rgb(0 0 0 / 0.4);
+  /* Opaque dark wood: ≥ 4.5:1 on the tray. */
+  color: #4a3a28;
 }
 .hand-piece {
   position: relative;
@@ -413,7 +425,7 @@ body {
   place-items: center;
   translate: -50% -60%;
   pointer-events: none;
-  filter: drop-shadow(0 6px 8px rgb(0 0 0 / 0.3));
+  filter: drop-shadow(0 6px 8px rgb(var(--shadow-rgb) / 0.3));
 }
 
 /* ------------------------------------------------------------------ overlays on the board */
@@ -432,7 +444,7 @@ body {
   box-sizing: border-box;
   border-radius: 10px;
   background: var(--card);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  box-shadow: 0 8px 24px rgb(var(--shadow-rgb) / 0.35);
 }
 .promote-choice {
   flex: 1;
@@ -466,7 +478,7 @@ body {
   gap: 6px;
   padding: 4px 12px;
   border-radius: 999px;
-  background: rgb(34 38 46 / 0.82);
+  background: rgb(42 35 28 / 0.84);
   color: #fff;
   font-size: 13px;
   pointer-events: none;
@@ -506,7 +518,7 @@ body {
   color: #fff3e6;
   font-size: 13px;
   line-height: 1.5;
-  box-shadow: 0 6px 16px rgb(0 0 0 / 0.25);
+  box-shadow: 0 6px 16px rgb(var(--shadow-rgb) / 0.25);
   animation: pop-in 0.18s ease-out;
 }
 
@@ -649,12 +661,17 @@ body {
   cursor: pointer;
 }
 .btn:disabled {
-  opacity: 0.4;
-  cursor: default;
+  /* A muted fill instead of a washed-out accent (a pale red reads as an error). */
+  background: #e6ddcc;
+  color: #857a6c;
+  cursor: not-allowed;
 }
 .btn-step {
   min-width: 56px;
-  background: #3e5f4a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #4a4037;
   color: #fff;
 }
 .btn-primary {
@@ -680,7 +697,7 @@ body {
   padding: 10px 18px;
   border-radius: 999px;
   font-weight: 700;
-  box-shadow: 0 8px 20px rgb(0 0 0 / 0.2);
+  box-shadow: 0 8px 20px rgb(var(--shadow-rgb) / 0.2);
   animation: drop-in 0.2s ease-out;
   pointer-events: none;
 }
@@ -712,7 +729,7 @@ body {
   background: var(--ink);
   color: #fff;
   font-size: 14px;
-  box-shadow: 0 8px 20px rgb(0 0 0 / 0.25);
+  box-shadow: 0 8px 20px rgb(var(--shadow-rgb) / 0.25);
   white-space: nowrap;
 }
 .undo-action {
@@ -727,7 +744,6 @@ body {
 }
 .undo-toast .icon-button {
   color: #fff;
-  font-size: 16px;
 }
 
 /* ------------------------------------------------------------------ dialogs */
@@ -741,7 +757,7 @@ body {
   border-radius: 18px;
   background: var(--card);
   color: var(--ink);
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.35);
+  box-shadow: 0 24px 60px rgb(var(--shadow-rgb) / 0.35);
 }
 .modal::backdrop {
   background: rgb(24 18 10 / 0.5);
@@ -1106,7 +1122,7 @@ body {
 }
 .mode-tab[aria-current='page'] {
   background: var(--card);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  box-shadow: 0 1px 3px rgb(var(--shadow-rgb) / 0.15);
 }
 
 /* ------------------------------------------------------------------ lobby */
@@ -1350,7 +1366,8 @@ body {
   color: #fff;
 }
 .clock-warn.clock-running {
-  background: #b77a12;
+  /* Dark amber: white text stays ≥ 4.5:1. */
+  background: #8f5e0b;
 }
 .clock-danger.clock-running {
   background: var(--shu);

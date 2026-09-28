@@ -18,6 +18,7 @@ import { atEnd, currentState, openRecord, play, resign, seek, visibleOutcome } f
 import type { GameRecord, GameView } from '../core/record'
 import { gameWaza } from '../core/waza/tracker'
 import { readJson, writeJson } from '../../../site/storage'
+import { IconChevronLeft, IconChevronRight, IconClose, IconFlip, IconSettings } from '../../../site/icons'
 import type { MoveAnimation } from './Board'
 import { playMoveSound, unlockAudio, vibrate } from './feedback'
 import { FirstMoveDemo } from './FirstMoveDemo'
@@ -491,10 +492,10 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
             aria-pressed={settings.flipped}
             onClick={() => changeSettings({ ...settings, flipped: !settings.flipped })}
           >
-            ⇅
+            <IconFlip />
           </button>
           <button type="button" className="icon-button" aria-label="設定" aria-haspopup="dialog" onClick={() => setDialog('settings')}>
-            ⚙
+            <IconSettings />
           </button>
         </div>
       </div>
@@ -555,7 +556,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
 
       <div className="controls">
         <button type="button" className="btn btn-step" aria-label="一手戻る" disabled={view.cursor === 0} onClick={() => goTo(view.cursor - 1)}>
-          ＜
+          <IconChevronLeft />
         </button>
         <button
           type="button"
@@ -564,7 +565,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
           disabled={view.cursor === view.record.moves.length}
           onClick={() => goTo(view.cursor + 1)}
         >
-          ＞
+          <IconChevronRight />
         </button>
         <button type="button" className="btn btn-primary" onClick={() => newGame()}>
           新規対局
@@ -602,7 +603,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
             元に戻す
           </button>
           <button type="button" className="icon-button" aria-label="閉じる" onClick={() => setResetUndo(null)}>
-            ✕
+            <IconClose />
           </button>
         </div>
       )}

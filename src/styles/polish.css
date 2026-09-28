@@ -1,0 +1,174 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+/* Typography and interaction states (redesign pass, docs/PLAN.md §9.8).
+   Page headings take the mincho display face; every control answers hover
+   and press; motion stays small and is dropped for reduced-motion users. */
+
+/* ------------------------------------------------------------------ headings */
+.site-page h1,
+.site-page h2,
+.guide h2,
+.records-title,
+.lobby-card h2,
+.modal-title {
+  font-family: var(--display-font);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-wrap: balance;
+  /* Break Japanese headings between phrases, not mid-word (Chromium). */
+  word-break: auto-phrase;
+}
+.site-page h1 {
+  font-size: 26px;
+}
+.site-page h2,
+.guide h2 {
+  padding-bottom: 8px;
+  border-bottom: 0;
+  /* A short vermilion rule over a hairline: the one accent, used sparingly. */
+  background:
+    linear-gradient(var(--shu), var(--shu)) left bottom / 28px 2px no-repeat,
+    linear-gradient(var(--line), var(--line)) left bottom / 100% 1px no-repeat;
+}
+.site-page h3,
+.guide h3 {
+  font-weight: 600;
+}
+.site-page p,
+.site-page li,
+.guide p,
+.guide li,
+.faq dd {
+  text-wrap: pretty;
+}
+
+/* ------------------------------------------------------------------ links in text */
+.site-page a,
+.guide a {
+  color: var(--shu-deep);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.site-page a:hover,
+.guide a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* ------------------------------------------------------------------ hover and press */
+.btn,
+.chip,
+.icon-button,
+.mode-tab,
+.level-button,
+.segment span,
+.site-header-link,
+.site-footer-nav a {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+@media (hover: hover) {
+  .btn-primary:not(:disabled):hover {
+    background: #9f3127;
+  }
+  .btn-step:not(:disabled):hover {
+    background: #3a3129;
+  }
+  .btn-quiet:not(:disabled):hover {
+    background: #dcd2bf;
+  }
+  .btn-danger:not(:disabled):hover {
+    background: #661d16;
+  }
+  .chip:not(:disabled):hover,
+  .level-button:hover {
+    border-color: #b8a988;
+    background: #fbf6ec;
+  }
+  .mode-tab:not([aria-current='page']):hover {
+    background: rgb(255 255 255 / 0.55);
+  }
+}
+.btn:not(:disabled):active,
+.chip:not(:disabled):active,
+.icon-button:active,
+.mode-tab:active,
+.level-button:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* ------------------------------------------------------------------ where am I, skip link */
+.site-header-link[aria-current='page'] {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--shu);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -60px;
+  z-index: 60;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .chip,
+  .icon-button,
+  .mode-tab,
+  .level-button,
+  .segment span,
+  .site-header-link,
+  .site-footer-nav a {
+    transition: none;
+  }
+  .btn:active,
+  .chip:active,
+  .icon-button:active,
+  .mode-tab:active,
+  .level-button:active {
+    transform: none;
+  }
+}
+
+/* The skip link's target: focusable, but no ring around the whole page. */
+#content:focus {
+  outline: none;
+}
+
+/* ------------------------------------------------------------------ icons */
+.icon {
+  display: block;
+  flex: none;
+}
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.kifu-caret {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+.kifu-open .kifu-caret {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kifu-caret {
+    transition: none;
+  }
+}

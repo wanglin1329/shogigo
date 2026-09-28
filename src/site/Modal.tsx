@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 
+import { IconClose } from './icons'
+
 /**
  * Native <dialog> opened with showModal(): the browser provides the focus
  * trap, Esc handling, the inert background and focus return on close.
@@ -46,7 +48,7 @@ export function Modal({
         <header className="modal-head">
           <h2 className={hideTitle ? 'sr-only' : 'modal-title'}>{title}</h2>
           <button type="button" className="icon-button" aria-label="閉じる" onClick={onClose}>
-            ✕
+            <IconClose />
           </button>
         </header>
         {open && children}

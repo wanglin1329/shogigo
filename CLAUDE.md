@@ -33,6 +33,6 @@
 - 「本作では」と書く事実は必ずコードで確かめる。一般ルールは日本将棋連盟の対局規則に合わせる（入玉宣言の点数条件は未確認なので書いていない）
 - `src/styles/*.css` は `styles.css` の先頭で `@import` されるので、同じ詳細度なら styles.css 本体のルールが勝つ。上書きしたいときは詳細度を上げる（`desktop.css` は `body .game`）
 - 対局画面の3つの包み（`game-top` / `game-main` / `game-bottom`）は、スマホでは `display: contents`、1024px 以上で2カラムのグリッドになる。対局画面に要素を足すときは、どの包みに入れるかを決める
-- リモート：`origin` は非公開の `wanglin1329/shigigo`（普段の push 先）。公開リポジトリは `wanglin1329/shogi`（サイトの GitHub リンク先）。**GPL のため、本番にデプロイした版は公開リポジトリにも push しておく**
+- リモート：`origin` は非公開の `wanglin1329/shigigo`（普段の push 先）。公開リポジトリは `wanglin1329/shogi`（サイトの GitHub リンク先）。**公開リポジトリへの push はユーザーが明示的に指示したときだけ**（デプロイのついでに push しない）
 - 本番の D1 は変更のたびに `wrangler d1 migrations apply shogi --remote` を先に
 - ポート: dev 3160 / preview 3161（3100・3101 はユーザー用）

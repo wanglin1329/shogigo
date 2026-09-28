@@ -719,7 +719,7 @@ M1 的验收**只盯四件事**：完整的 AI 对局、友达对战、随机匹
 **7. 上线验收清单**（绑域名，要用户确认后执行）
 - [ ] Workers Paid
 - [x] 源码仓库已公开（`github.com/wanglin1329/shogi`，2026-09-28 首次推送），`/license` 的链接能打开
-- [ ] ⚠️ GPL：线上分发的版本，其源码必须能从公开仓库取得。部署新版本时，要把相同的提交也推送到公开仓库（日常推送到私有的 origin 时容易漏掉）
+- [ ] 公开仓库何时同步由用户决定：**只有用户明确说「推公开仓库」时才推送**，部署时不自动推送
 - [ ] `hi@shogigo.com` 能收到信（Email Routing）
 - [ ] wrangler `routes` 加入 `shogigo.com` 的 custom domain；`www` 用 Cloudflare **Redirect Rule** 301 到裸域名。静态页面不经过 Worker，所以不能在 Worker 里做跳转
 - [ ] 两个主机名的证书都已生效；`/`、`/board`、`/online`、带查询参数的 URL、`www` 跳转都实测过
@@ -776,7 +776,7 @@ M1 的验收**只盯四件事**：完整的 AI 对局、友达对战、随机匹
 
 **上线前剩下的**（§9.5-7，需要用户操作或确认）：
 - Workers Paid；
-- 部署新版本时同步推送到公开仓库（GPL 的对应源码）；
+- 公开仓库的同步由用户决定（只在用户明确指示时推送）；
 - `hi@` 的 Email Routing；
 - 在 Plausible 里给本站建站点，把脚本地址填进 `VITE_PLAUSIBLE_SRC`，并同时更新 `/privacy` 的日期；
 - 绑定 custom domain，`www` 用 Redirect Rule 跳转；

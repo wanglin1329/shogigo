@@ -108,51 +108,57 @@ export function TutorialGame({ settings, onLobby, onSeek }: { settings: ShogiSet
 
   return (
     <div className="game">
-      <p className="bot-banner" role="note">
-        練習対局です。COMは手加減してくれます。勝つと「だれかと対局」ができるようになります。
-      </p>
-      <GameBoard
-        state={state}
-        input={input}
-        interactive={interactive}
-        flipped={false}
-        pieceStyle={settings.pieceStyle}
-        moveHints={settings.moveHints}
-        label={(side) => (side === 'sente' ? 'あなた' : 'COM')}
-        lastMove={lastMove}
-        animation={animation}
-        showCheckLine={false}
-      >
-        {ai.thinking && (
-          <div className="thinking" role="status">
-            <span className="thinking-dots" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            考え中
-          </div>
-        )}
-      </GameBoard>
-      <div className="controls">
-        {!outcome && view.record.moves.length > 0 && (
-          <button
-            type="button"
-            className={`btn btn-quiet ${confirmResign ? 'btn-danger' : ''}`}
-            onClick={() => {
-              if (!confirmResign) return setConfirmResign(true)
-              setConfirmResign(false)
-              ai.cancel()
-              setView(resign(view, 'sente'))
-              setResultOpen(true)
-            }}
-          >
-            {confirmResign ? '本当に投了する' : '投了'}
+      <div className="game-top">
+        <p className="bot-banner" role="note">
+          練習対局です。COMは手加減してくれます。勝つと「だれかと対局」ができるようになります。
+        </p>
+      </div>
+      <div className="game-main">
+        <GameBoard
+          state={state}
+          input={input}
+          interactive={interactive}
+          flipped={false}
+          pieceStyle={settings.pieceStyle}
+          moveHints={settings.moveHints}
+          label={(side) => (side === 'sente' ? 'あなた' : 'COM')}
+          lastMove={lastMove}
+          animation={animation}
+          showCheckLine={false}
+        >
+          {ai.thinking && (
+            <div className="thinking" role="status">
+              <span className="thinking-dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              考え中
+            </div>
+          )}
+        </GameBoard>
+      </div>
+      <div className="game-bottom">
+        <div className="controls">
+          {!outcome && view.record.moves.length > 0 && (
+            <button
+              type="button"
+              className={`btn btn-quiet ${confirmResign ? 'btn-danger' : ''}`}
+              onClick={() => {
+                if (!confirmResign) return setConfirmResign(true)
+                setConfirmResign(false)
+                ai.cancel()
+                setView(resign(view, 'sente'))
+                setResultOpen(true)
+              }}
+            >
+              {confirmResign ? '本当に投了する' : '投了'}
+            </button>
+          )}
+          <button type="button" className="btn btn-quiet" onClick={onLobby}>
+            ロビーに戻る
           </button>
-        )}
-        <button type="button" className="btn btn-quiet" onClick={onLobby}>
-          ロビーに戻る
-        </button>
+        </div>
       </div>
 
       <Modal open={resultOpen && !!outcome} title={won ? 'チュートリアル達成！' : 'COMの勝ち'} onClose={() => setResultOpen(false)} className={`modal-result ${won ? 'result-win' : 'result-lose'}`}>

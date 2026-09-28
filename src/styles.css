@@ -6,6 +6,7 @@
 @import './styles/site.css';
 @import './styles/polish.css';
 @import './styles/guide.css';
+@import './styles/desktop.css';
 
 /* Piece glyphs only: a subset of Shippori Mincho B1 (SIL OFL 1.1, public/fonts/OFL.txt).
    Self-hosted so that no page load contacts a third party (docs/PLAN.md §9.5-4). */

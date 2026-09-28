@@ -19,6 +19,7 @@ import type { GameRecord, GameView } from '../core/record'
 import { gameWaza } from '../core/waza/tracker'
 import { readJson, writeJson } from '../../../site/storage'
 import { IconChevronLeft, IconChevronRight, IconClose, IconFlip, IconSettings } from '../../../site/icons'
+import { isWideScreen, useOpenOnWideScreen } from '../../../site/viewport'
 import type { MoveAnimation } from './Board'
 import { playMoveSound, unlockAudio, vibrate } from './feedback'
 import { FirstMoveDemo } from './FirstMoveDemo'
@@ -106,6 +107,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
   const [dialog, setDialog] = useState<'result' | 'settings' | 'level' | 'import' | null>(null)
   const [pendingSide, setPendingSide] = useState<Player | null>(null)
   const [kifuOpen, setKifuOpen] = useState(false)
+  useOpenOnWideScreen(setKifuOpen)
   const [confirmResign, setConfirmResign] = useState(false)
   const [unlockedNow, setUnlockedNow] = useState<AiLevelId | null>(null)
   const [animation, setAnimation] = useState<MoveAnimation | null>(null)
@@ -181,7 +183,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     clearShareParams()
     setReview(null)
     reload()
-    setKifuOpen(false)
+    setKifuOpen(isWideScreen())
   }
 
   const humanSide = settings.aiPlayerSide
@@ -417,7 +419,7 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
     ai.newGame()
     input.clear()
     setDialog(null)
-    setKifuOpen(false)
+    setKifuOpen(isWideScreen())
     setConfirmResign(false)
   }
 
@@ -479,115 +481,121 @@ export function ShogiGame({ shared = null }: { shared?: SharedKifuLink | null })
 
   return (
     <div className="game" onPointerDown={unlockAudio}>
-      <div className="game-toolbar">
-        <button type="button" className="level-button" onClick={() => setDialog('level')} aria-haspopup="dialog">
-          <span className="level-caption">強さ</span>
-          <span className="level-value">{levelInfo.label}</span>
-        </button>
-        <div className="toolbar-actions">
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="盤面を反転"
-            aria-pressed={settings.flipped}
-            onClick={() => changeSettings({ ...settings, flipped: !settings.flipped })}
-          >
-            <IconFlip />
+      <div className="game-top">
+        <div className="game-toolbar">
+          <button type="button" className="level-button" onClick={() => setDialog('level')} aria-haspopup="dialog">
+            <span className="level-caption">強さ</span>
+            <span className="level-value">{levelInfo.label}</span>
           </button>
-          <button type="button" className="icon-button" aria-label="設定" aria-haspopup="dialog" onClick={() => setDialog('settings')}>
-            <IconSettings />
-          </button>
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="盤面を反転"
+              aria-pressed={settings.flipped}
+              onClick={() => changeSettings({ ...settings, flipped: !settings.flipped })}
+            >
+              <IconFlip />
+            </button>
+            <button type="button" className="icon-button" aria-label="設定" aria-haspopup="dialog" onClick={() => setDialog('settings')}>
+              <IconSettings />
+            </button>
+          </div>
         </div>
+
+        {review && (
+          <div className="review-banner" role="status">
+            <div>
+              <strong>
+                {review.source === 'shared' ? '共有された棋譜' : '読み込んだ棋譜'}（{review.plies}手）
+              </strong>
+              <span>駒を動かすと、{view.cursor}手目の局面から続きをAIと指せます</span>
+            </div>
+            <button type="button" className="chip" onClick={leaveReview}>
+              自分の対局に戻る
+            </button>
+          </div>
+        )}
       </div>
 
-      {review && (
-        <div className="review-banner" role="status">
-          <div>
-            <strong>
-              {review.source === 'shared' ? '共有された棋譜' : '読み込んだ棋譜'}（{review.plies}手）
-            </strong>
-            <span>駒を動かすと、{view.cursor}手目の局面から続きをAIと指せます</span>
-          </div>
-          <button type="button" className="chip" onClick={leaveReview}>
-            自分の対局に戻る
-          </button>
-        </div>
-      )}
-
-      <GameBoard
-        state={state}
-        input={input}
-        interactive={interactive}
-        flipped={flipped}
-        pieceStyle={settings.pieceStyle}
-        moveHints={settings.moveHints}
-        label={sideLabel}
-        lastMove={lastMove}
-        animation={animation}
-        showCheckLine={checkLineVisible || dialog === 'result'}
-        overlay={
-          <>
-            {demo && <FirstMoveDemo text={demo} />}
-            <WazaEffect waza={waza} trigger={animation?.id ?? null} ended={!!outcome} flipped={flipped} level={settings.wazaFx} />
-          </>
-        }
-      >
-        {ai.thinking && (
-          <div className={`thinking ${flipped ? 'thinking-bottom' : ''}`} role="status">
-            <span className="thinking-dots" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-            考え中
-          </div>
-        )}
-      </GameBoard>
-
-      <KifuBar
-        view={view}
-        open={kifuOpen}
-        onToggle={() => setKifuOpen((o) => !o)}
-        onJump={goTo}
-        onImport={() => setDialog('import')}
-        keptName={kept ? WAZA_COPY[kept.id].name : null}
-        turnLabel={outcome ? '対局終了' : `手番：${sideLabel(state.currentPlayer)}`}
-      />
-
-      <div className="controls">
-        <button type="button" className="btn btn-step" aria-label="一手戻る" disabled={view.cursor === 0} onClick={() => goTo(view.cursor - 1)}>
-          <IconChevronLeft />
-        </button>
-        <button
-          type="button"
-          className="btn btn-step"
-          aria-label="一手進む"
-          disabled={view.cursor === view.record.moves.length}
-          onClick={() => goTo(view.cursor + 1)}
+      <div className="game-main">
+        <GameBoard
+          state={state}
+          input={input}
+          interactive={interactive}
+          flipped={flipped}
+          pieceStyle={settings.pieceStyle}
+          moveHints={settings.moveHints}
+          label={sideLabel}
+          lastMove={lastMove}
+          animation={animation}
+          showCheckLine={checkLineVisible || dialog === 'result'}
+          overlay={
+            <>
+              {demo && <FirstMoveDemo text={demo} />}
+              <WazaEffect waza={waza} trigger={animation?.id ?? null} ended={!!outcome} flipped={flipped} level={settings.wazaFx} />
+            </>
+          }
         >
-          <IconChevronRight />
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => newGame()}>
-          新規対局
-        </button>
-        {!view.outcome && view.record.moves.length > 0 && (
+          {ai.thinking && (
+            <div className={`thinking ${flipped ? 'thinking-bottom' : ''}`} role="status">
+              <span className="thinking-dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              考え中
+            </div>
+          )}
+        </GameBoard>
+      </div>
+
+      <div className="game-bottom">
+        <KifuBar
+          view={view}
+          open={kifuOpen}
+          onToggle={() => setKifuOpen((o) => !o)}
+          onJump={goTo}
+          onImport={() => setDialog('import')}
+          keptName={kept ? WAZA_COPY[kept.id].name : null}
+          turnLabel={outcome ? '対局終了' : `手番：${sideLabel(state.currentPlayer)}`}
+        />
+
+        <div className="controls">
+          <button type="button" className="btn btn-step" aria-label="一手戻る" disabled={view.cursor === 0} onClick={() => goTo(view.cursor - 1)}>
+            <IconChevronLeft />
+          </button>
           <button
             type="button"
-            className={`btn btn-quiet ${confirmResign ? 'btn-danger' : ''}`}
-            onClick={() => {
-              if (!confirmResign) {
-                setConfirmResign(true)
-                setTimeout(() => setConfirmResign(false), 3000)
-                return
-              }
-              setConfirmResign(false)
-              ai.cancel()
-              finish(update((v) => resign(seek(v, v.record.moves.length), humanSide)))
-            }}
+            className="btn btn-step"
+            aria-label="一手進む"
+            disabled={view.cursor === view.record.moves.length}
+            onClick={() => goTo(view.cursor + 1)}
           >
-            {confirmResign ? '本当に投了する' : '投了'}
+            <IconChevronRight />
           </button>
-        )}
+          <button type="button" className="btn btn-primary" onClick={() => newGame()}>
+            新規対局
+          </button>
+          {!view.outcome && view.record.moves.length > 0 && (
+            <button
+              type="button"
+              className={`btn btn-quiet ${confirmResign ? 'btn-danger' : ''}`}
+              onClick={() => {
+                if (!confirmResign) {
+                  setConfirmResign(true)
+                  setTimeout(() => setConfirmResign(false), 3000)
+                  return
+                }
+                setConfirmResign(false)
+                ai.cancel()
+                finish(update((v) => resign(seek(v, v.record.moves.length), humanSide)))
+              }}
+            >
+              {confirmResign ? '本当に投了する' : '投了'}
+            </button>
+          )}
+        </div>
       </div>
 
       {notice && (

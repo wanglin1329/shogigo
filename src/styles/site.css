@@ -4,8 +4,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* Same column as the text below, so the logo lines up with the content. */
-  max-width: 720px;
+  /* The site's outer width (as mahjongtime: max-w-screen-xl). */
+  max-width: 1280px;
   height: 48px;
   margin: 0 auto;
   padding: 0 16px;
@@ -37,7 +37,7 @@
 }
 
 .site-footer {
-  max-width: 720px;
+  max-width: 1280px;
   margin: 48px auto 0;
   padding: 24px 16px 32px;
   border-top: 1px solid #e3d8c3;
@@ -63,7 +63,8 @@
 /* ------------------------------------------------------------------ text pages (legal, 404) and the guide under each game */
 .site-page,
 .guide {
-  max-width: 720px;
+  /* Reading width (~45 Japanese characters a line), as mahjongtime's text. */
+  max-width: 768px;
   margin: 0 auto;
   padding: 16px 16px 0;
   line-height: 1.85;

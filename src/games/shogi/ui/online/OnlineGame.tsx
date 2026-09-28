@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBlocker } from '@tanstack/react-router'
 
 import type { GameState, Move, Player } from '../../core/engine'
-import { parseUsiMove } from '../../core/kifu/moves'
+import { formatUsiMove, parseUsiMove } from '../../core/kifu/moves'
 import { openRecord } from '../../core/record'
 import type { GameView } from '../../core/record'
 import { gameWaza } from '../../core/waza/tracker'
@@ -15,6 +15,7 @@ import { ANONYMOUS, COM_NAME, shownName } from '../../online/identity'
 import type { ConnectionStatus } from '../../online/room'
 import type { DisconnectInfo, MatchPayload } from '../../server/protocol'
 import { Modal } from '../../../../site/Modal'
+import { useOpenOnWideScreen } from '../../../../site/viewport'
 import type { MoveAnimation } from '../Board'
 import { announce } from '../byoyomi'
 import { playMoveSound, vibrate } from '../feedback'
@@ -124,6 +125,10 @@ export function OnlineGame({
     moveHints: settings.moveHints,
     onMove: (move) => {
       if (settings.sound) playMoveSound()
+      // My move slides now, as it is shown (optimistically) — not again when
+      // the server confirms this very move.
+      animate(move)
+      playedHere.current = { ply: moves.length + 1, usi: formatUsiMove(move) }
       model.playMove(move)
     },
   })
@@ -131,18 +136,36 @@ export function OnlineGame({
   // ------------------------------------------------------------ moves arriving (animation, sound, check line)
   const [animation, setAnimation] = useState<MoveAnimation | null>(null)
   const [checkLine, setCheckLine] = useState(false)
+  const animationSeq = useRef(0)
+  /** The move this page just played (already animated), until the server confirms it. */
+  const playedHere = useRef<{ ply: number; usi: string } | null>(null)
+  /** Changes when exactly one confirmed move arrives (a resync that adds several does not replay waza). */
+  const [wazaTrigger, setWazaTrigger] = useState(0)
+  function animate(move: Move) {
+    setAnimation({ from: move.type === 'move' ? { x: move.fromX, y: move.fromY } : null, to: { x: move.toX, y: move.toY }, id: ++animationSeq.current })
+  }
   const seen = useRef(moves.length)
   useEffect(() => {
     if (moves.length <= seen.current) {
       seen.current = moves.length
       return
     }
+    const added = moves.length - seen.current
     seen.current = moves.length
-    const last = parseUsiMove(moves[moves.length - 1])
-    if (last) setAnimation({ from: last.type === 'move' ? { x: last.fromX, y: last.fromY } : null, to: { x: last.toX, y: last.toY }, id: moves.length })
-    // The mover is whoever is not to move now. My own moves already sounded
-    // when played; the opponent's sound (and buzz) on arrival.
-    if (position.currentPlayer === me) {
+    const lastUsi = moves[moves.length - 1]
+    // Already animated when played on this page: the server confirmed that very move.
+    const mine = playedHere.current
+    const confirmedHere = added === 1 && mine !== null && mine.ply === moves.length && mine.usi === lastUsi
+    playedHere.current = null
+    if (!confirmedHere) {
+      const last = parseUsiMove(lastUsi)
+      if (last) animate(last)
+    }
+    if (added === 1) setWazaTrigger((n) => n + 1)
+    // Online games start from the initial position: odd plies are 先手's.
+    // My own moves sounded when played; the opponent's sound (and buzz) on arrival.
+    const mover: Player = moves.length % 2 === 1 ? 'sente' : 'gote'
+    if (mover !== me) {
       if (settings.sound) playMoveSound()
       if (settings.haptics) vibrate()
     }
@@ -227,6 +250,7 @@ export function OnlineGame({
   // ------------------------------------------------------------ kifu
   const view: GameView = useMemo(() => openRecord({ initialSfen: null, moves: [...moves] }), [moves])
   const [kifuOpen, setKifuOpen] = useState(false)
+  useOpenOnWideScreen(setKifuOpen)
   const waza = useWazaDetection({ initialSfen: null, moves: view.record.moves, cursor: view.cursor, owners: [me] })
   const kept = waza.keptAt(view.cursor)
 
@@ -309,86 +333,91 @@ export function OnlineGame({
 
   return (
     <div className="game online-game">
-      {playerRow(opp)}
-      <GameBoard
-        state={position}
-        input={input}
-        interactive={myTurn && !model.sending}
-        flipped={flipped}
-        pieceStyle={settings.pieceStyle}
-        moveHints={settings.moveHints}
-        label={(side) => (side === me ? 'あなた' : nameOf(side))}
-        lastMove={position.lastMove}
-        animation={animation}
-        showCheckLine={checkLine}
-        overlay={
-          <>
-            {startOverlay && (
-              <div className="start-overlay" role="status">
-                <strong>対局開始</strong>
-                <span>あなたは{me === 'sente' ? '先手（先に指す）' : '後手'}です</span>
-              </div>
-            )}
-            <WazaEffect waza={waza} trigger={animation?.id ?? null} ended={over} flipped={flipped} level={settings.wazaFx} />
-          </>
-        }
-      />
-      {playerRow(me)}
+      <div className="game-main">
+        {playerRow(opp)}
+        <GameBoard
+          state={position}
+          input={input}
+          interactive={myTurn && !model.sending}
+          flipped={flipped}
+          pieceStyle={settings.pieceStyle}
+          moveHints={settings.moveHints}
+          label={(side) => (side === me ? 'あなた' : nameOf(side))}
+          lastMove={position.lastMove}
+          animation={animation}
+          showCheckLine={checkLine}
+          overlay={
+            <>
+              {startOverlay && (
+                <div className="start-overlay" role="status">
+                  <strong>対局開始</strong>
+                  <span>あなたは{me === 'sente' ? '先手（先に指す）' : '後手'}です</span>
+                </div>
+              )}
+              {/* Fired by confirmed moves: the waza of my move is known only once the server has it. */}
+              <WazaEffect waza={waza} trigger={wazaTrigger} ended={over} flipped={flipped} level={settings.wazaFx} />
+            </>
+          }
+        />
+        {playerRow(me)}
+      </div>
 
-      {model.error && (
-        <p className="online-error" role="alert">
-          {model.error}
-        </p>
-      )}
-      {model.connection && model.connection !== 'open' && !over && (
-        <p className="online-connection" role="status">
-          {model.connection === 'polling' ? '通信が不安定なため、ゆっくり更新しています…' : '接続中…'}
-        </p>
-      )}
-
-      <KifuBar
-        view={view}
-        open={kifuOpen}
-        onToggle={() => setKifuOpen((o) => !o)}
-        keptName={kept ? WAZA_COPY[kept.id].name : null}
-        turnLabel={over ? '対局終了' : `手番：${nameOf(position.currentPlayer)}`}
-      />
-
-      <div className="controls">
-        {!over ? (
-          <>
-            <button
-              type="button"
-              className={`btn btn-quiet ${confirm === 'resign' ? 'btn-danger' : ''}`}
-              disabled={!started}
-              onClick={() => (confirm === 'resign' ? (setConfirm(null), model.resign()) : setConfirm('resign'))}
-            >
-              {confirm === 'resign' ? '本当に投了する' : '投了'}
-            </button>
-            <button
-              type="button"
-              className={`btn btn-quiet ${confirm === 'leave' ? 'btn-danger' : ''}`}
-              onClick={() => {
-                if (!started) return onLobby()
-                if (confirm !== 'leave') return setConfirm('leave')
-                // Leave only after the resignation went out: leaving closes the
-                // connection, and a lost resignation would become a 60 s disconnect.
-                void Promise.resolve(model.resign()).finally(onLobby)
-              }}
-            >
-              {confirm === 'leave' ? '投了して戻る' : 'ロビーに戻る'}
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="btn btn-primary" onClick={onAgain}>
-              {againLabel}
-            </button>
-            <button type="button" className="btn btn-quiet" onClick={onLobby}>
-              ロビーに戻る
-            </button>
-          </>
+      <div className="game-bottom">
+        {model.error && (
+          <p className="online-error" role="alert">
+            {model.error}
+          </p>
         )}
+        {model.connection && model.connection !== 'open' && !over && (
+          <p className="online-connection" role="status">
+            {model.connection === 'polling' ? '通信が不安定なため、ゆっくり更新しています…' : '接続中…'}
+          </p>
+        )}
+
+        <KifuBar
+          view={view}
+          open={kifuOpen}
+          onToggle={() => setKifuOpen((o) => !o)}
+          keptName={kept ? WAZA_COPY[kept.id].name : null}
+          turnLabel={over ? '対局終了' : `手番：${nameOf(position.currentPlayer)}`}
+        />
+
+        <div className="controls">
+          {!over ? (
+            <>
+              <button
+                type="button"
+                className={`btn btn-quiet ${confirm === 'resign' ? 'btn-danger' : ''}`}
+                disabled={!started}
+                onClick={() => (confirm === 'resign' ? (setConfirm(null), model.resign()) : setConfirm('resign'))}
+              >
+                {confirm === 'resign' ? '本当に投了する' : '投了'}
+              </button>
+              <button
+                type="button"
+                className={`btn btn-quiet ${confirm === 'leave' ? 'btn-danger' : ''}`}
+                onClick={() => {
+                  if (!started) return onLobby()
+                  if (confirm !== 'leave') return setConfirm('leave')
+                  // Leave only after the resignation went out: leaving closes the
+                  // connection, and a lost resignation would become a 60 s disconnect.
+                  void Promise.resolve(model.resign()).finally(onLobby)
+                }}
+              >
+                {confirm === 'leave' ? '投了して戻る' : 'ロビーに戻る'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn btn-primary" onClick={onAgain}>
+                {againLabel}
+              </button>
+              <button type="button" className="btn btn-quiet" onClick={onLobby}>
+                ロビーに戻る
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <Modal

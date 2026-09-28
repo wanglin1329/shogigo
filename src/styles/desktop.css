@@ -1,0 +1,106 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+/* Wide and tall-enough screens (docs/PLAN.md §9.9): the game becomes two columns — the board
+   on the left, sized by the window height; the toolbar, kifu and buttons on
+   the right. Below 1024px the wrappers are transparent and nothing changes.
+   Selectors start with `body`: imported files come before styles.css's own
+   rules, which would otherwise win at equal specificity. */
+
+.game-top,
+.game-main,
+.game-bottom {
+  display: contents;
+}
+
+@media (min-width: 1024px) and (min-height: 720px) {
+  body .game {
+    --side-width: 360px;
+    --column-gap: 32px;
+    /* Board + two hands + coordinates must fit the window height (header and
+       tabs above), and the two columns the window width. 36–64px per square.
+       vh first: a browser without dvh drops the whole value (see @supports). */
+    --cell: clamp(
+      36px,
+      min(calc((100vw - 64px - 18px - var(--side-width) - var(--column-gap)) / 9), calc((100vh - 190px) / 11)),
+      64px
+    );
+    width: min(100%, calc(var(--board-width) + 8px + var(--column-gap) + var(--side-width)));
+    display: grid;
+    grid-template-columns: calc(var(--board-width) + 8px) var(--side-width);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      'main top'
+      'main bottom';
+    column-gap: var(--column-gap);
+    row-gap: 12px;
+    align-items: start;
+  }
+  /* Online: a name row above and below the board takes some height. */
+  body .online-game {
+    --cell: clamp(
+      36px,
+      min(calc((100vw - 64px - 18px - var(--side-width) - var(--column-gap)) / 9), calc((100vh - 290px) / 11)),
+      64px
+    );
+  }
+  @supports (height: 100dvh) {
+    body .game {
+      --cell: clamp(
+        36px,
+        min(calc((100vw - 64px - 18px - var(--side-width) - var(--column-gap)) / 9), calc((100dvh - 190px) / 11)),
+        64px
+      );
+    }
+    body .online-game {
+      --cell: clamp(
+        36px,
+        min(calc((100vw - 64px - 18px - var(--side-width) - var(--column-gap)) / 9), calc((100dvh - 290px) / 11)),
+        64px
+      );
+    }
+  }
+  body .game-top,
+  body .game-main,
+  body .game-bottom {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  body .game-top {
+    grid-area: top;
+  }
+  body .game-main {
+    grid-area: main;
+  }
+  body .game-bottom {
+    grid-area: bottom;
+  }
+  /* The side column is narrower than the board: let its rows fill it. */
+  body .game-bottom .controls {
+    justify-content: flex-start;
+  }
+  body .game-top .bot-banner {
+    width: 100%;
+    margin: 0;
+  }
+
+  /* Online lobby: the cards side by side; a message spans both columns. */
+  body .lobby {
+    width: min(100%, 980px);
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+  body .lobby > .online-error {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Records list: a little wider on a desktop. */
+@media (min-width: 1024px) {
+  body .records-title,
+  body .records-lead,
+  body .records {
+    width: min(100%, 760px);
+  }
+}

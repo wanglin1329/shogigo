@@ -9,6 +9,7 @@ import type { GameRecord, GameView } from '../core/record'
 import { gameWaza } from '../core/waza/tracker'
 import { IconChevronLeft, IconChevronRight, IconClose, IconFlip } from '../../../site/icons'
 import { writeJson } from '../../../site/storage'
+import { isWideScreen, useOpenOnWideScreen } from '../../../site/viewport'
 import { Modal } from '../../../site/Modal'
 import type { MoveAnimation } from './Board'
 import { playMoveSound, unlockAudio } from './feedback'
@@ -44,6 +45,7 @@ export function BoardMode() {
   const [notice, setNotice] = useState<{ text: string; id: number } | null>(null)
   const [checkLine, setCheckLine] = useState(false)
   const [kifuOpen, setKifuOpen] = useState(false)
+  useOpenOnWideScreen(setKifuOpen)
   const [dialog, setDialog] = useState<'result' | 'import' | null>(null)
   const [resetUndo, setResetUndo] = useState<{ view: GameView; meta: GameMeta } | null>(null)
   const [confirmResign, setConfirmResign] = useState(false)
@@ -162,7 +164,7 @@ export function BoardMode() {
     input.clear()
     update(() => openRecord(record, cursor))
     setDialog(null)
-    setKifuOpen(record !== EMPTY_RECORD)
+    setKifuOpen(record !== EMPTY_RECORD || isWideScreen())
   }
 
   // ← → step through the game unless the focus is on the board or in a dialog.
@@ -187,79 +189,85 @@ export function BoardMode() {
 
   return (
     <div className="game" onPointerDown={unlockAudio}>
-      <div className="game-toolbar">
-        <label className="setting-toggle board-autoflip">
-          <input
-            type="checkbox"
-            checked={settings.boardAutoFlip}
-            onChange={(e) => changeSettings({ ...settings, boardAutoFlip: e.target.checked })}
-          />
-          <span>毎手、手番の側から見る</span>
-        </label>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="盤面を反転"
-          aria-pressed={settings.flipped}
-          onClick={() => changeSettings({ ...settings, flipped: !settings.flipped })}
-        >
-          <IconFlip />
-        </button>
-      </div>
-
-      <GameBoard
-        state={state}
-        input={input}
-        interactive={restored && !outcome}
-        flipped={flipped}
-        pieceStyle={settings.pieceStyle}
-        moveHints={settings.moveHints}
-        label={(side) => SIDE[side]}
-        lastMove={lastMove}
-        animation={animation}
-        showCheckLine={checkLine}
-        overlay={<WazaEffect waza={waza} trigger={animation?.id ?? null} ended={!!outcome} flipped={flipped} level={settings.wazaFx} />}
-      />
-
-      <KifuBar
-        view={view}
-        open={kifuOpen}
-        onToggle={() => setKifuOpen((o) => !o)}
-        onJump={goTo}
-        onImport={() => setDialog('import')}
-        keptName={kept ? WAZA_COPY[kept.id].name : null}
-        turnLabel={outcome ? '対局終了' : `手番：${SIDE[state.currentPlayer]}`}
-      />
-
-      <div className="controls">
-        <button type="button" className="btn btn-step" aria-label="一手戻る" disabled={view.cursor === 0} onClick={() => goTo(view.cursor - 1)}>
-          <IconChevronLeft />
-        </button>
-        <button
-          type="button"
-          className="btn btn-step"
-          aria-label="一手進む"
-          disabled={view.cursor === view.record.moves.length}
-          onClick={() => goTo(view.cursor + 1)}
-        >
-          <IconChevronRight />
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => newGame()}>
-          新規対局
-        </button>
-        {!view.outcome && view.record.moves.length > 0 && !imported && (
+      <div className="game-top">
+        <div className="game-toolbar">
+          <label className="setting-toggle board-autoflip">
+            <input
+              type="checkbox"
+              checked={settings.boardAutoFlip}
+              onChange={(e) => changeSettings({ ...settings, boardAutoFlip: e.target.checked })}
+            />
+            <span>毎手、手番の側から見る</span>
+          </label>
           <button
             type="button"
-            className={`btn btn-quiet ${confirmResign ? 'btn-danger' : ''}`}
-            onClick={() => {
-              if (!confirmResign) return setConfirmResign(true)
-              setConfirmResign(false)
-              finish(update((v) => resign(seek(v, v.record.moves.length), resigner)))
-            }}
+            className="icon-button"
+            aria-label="盤面を反転"
+            aria-pressed={settings.flipped}
+            onClick={() => changeSettings({ ...settings, flipped: !settings.flipped })}
           >
-            {confirmResign ? `${SIDE[resigner]}が投了する` : `${SIDE[resigner]}の投了`}
+            <IconFlip />
           </button>
-        )}
+        </div>
+      </div>
+
+      <div className="game-main">
+        <GameBoard
+          state={state}
+          input={input}
+          interactive={restored && !outcome}
+          flipped={flipped}
+          pieceStyle={settings.pieceStyle}
+          moveHints={settings.moveHints}
+          label={(side) => SIDE[side]}
+          lastMove={lastMove}
+          animation={animation}
+          showCheckLine={checkLine}
+          overlay={<WazaEffect waza={waza} trigger={animation?.id ?? null} ended={!!outcome} flipped={flipped} level={settings.wazaFx} />}
+        />
+      </div>
+
+      <div className="game-bottom">
+        <KifuBar
+          view={view}
+          open={kifuOpen}
+          onToggle={() => setKifuOpen((o) => !o)}
+          onJump={goTo}
+          onImport={() => setDialog('import')}
+          keptName={kept ? WAZA_COPY[kept.id].name : null}
+          turnLabel={outcome ? '対局終了' : `手番：${SIDE[state.currentPlayer]}`}
+        />
+
+        <div className="controls">
+          <button type="button" className="btn btn-step" aria-label="一手戻る" disabled={view.cursor === 0} onClick={() => goTo(view.cursor - 1)}>
+            <IconChevronLeft />
+          </button>
+          <button
+            type="button"
+            className="btn btn-step"
+            aria-label="一手進む"
+            disabled={view.cursor === view.record.moves.length}
+            onClick={() => goTo(view.cursor + 1)}
+          >
+            <IconChevronRight />
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => newGame()}>
+            新規対局
+          </button>
+          {!view.outcome && view.record.moves.length > 0 && !imported && (
+            <button
+              type="button"
+              className={`btn btn-quiet ${confirmResign ? 'btn-danger' : ''}`}
+              onClick={() => {
+                if (!confirmResign) return setConfirmResign(true)
+                setConfirmResign(false)
+                finish(update((v) => resign(seek(v, v.record.moves.length), resigner)))
+              }}
+            >
+              {confirmResign ? `${SIDE[resigner]}が投了する` : `${SIDE[resigner]}の投了`}
+            </button>
+          )}
+        </div>
       </div>
 
       {notice && (

@@ -154,3 +154,7 @@
 .faq dd {
   margin: 4px 0 0;
 }
+.site-header-nav {
+  display: flex;
+  gap: 14px;
+}

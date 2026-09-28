@@ -49,6 +49,11 @@ for (const page of [
   '/license.html',
   '/sitemap.xml',
   '/robots.txt',
+  '/guide.html',
+  // Rules guide chapters: prerendered through the links on /guide.
+  ...[...readFileSync('src/content/guide/chapters/index.ts', 'utf8').matchAll(/from '\.\/\d\d-([a-z0-9-]+)'/g)].map(
+    (m) => `/guide/${m[1]}.html`,
+  ),
 ]) {
   if (!files.includes(page)) failures.push(`expected prerendered page ${page}`)
 }
@@ -87,6 +92,12 @@ if (existsSync('.dev.vars')) {
     const body = readFileSync(path, 'latin1')
     if (secrets.some((s) => body.includes(s))) failures.push(`a .dev.vars value appears in ${path}`)
   }
+}
+
+// 7. Pages are written as /name.html (autoSubfolderIndex: false). A nested
+//    index.html would be a second copy served at /name/ (duplicate content).
+for (const f of files) {
+  if (f !== '/index.html' && f.endsWith('/index.html')) failures.push(`duplicate page ${f} (skip trailing-slash paths in prerender)`)
 }
 
 // 6. env/.env is committed and ships to the browser: only the known public keys.

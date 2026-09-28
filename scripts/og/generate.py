@@ -92,6 +92,18 @@ def make_icons():
 
 # Rows a..i (top = gote's side), files 9..1 left to right. "v" = gote piece.
 POSITIONS = {
+    # 頭金: the first mate every beginner learns.
+    "guide": [
+        ". . . . v王 . . . .",
+        ". . . . 金 . . . .",
+        ". . . . 歩 . . . .",
+        ". . . . . . . . .",
+        ". . . . . . . . .",
+        ". . . . . . . . .",
+        "歩 歩 歩 歩 . 歩 歩 歩 歩",
+        ". 角 . . . . . 飛 .",
+        "香 桂 銀 金 玉 . 銀 桂 香",
+    ],
     # After 7六歩 3四歩 2六歩 8四歩 2五歩 8五歩 7八金 3二金: a quiet 相掛かり opening.
     "home": [
         "v香 v桂 v銀 v金 v玉 . v銀 v桂 v香",
@@ -130,6 +142,7 @@ POSITIONS = {
 }
 
 COPY = {
+    "guide": ("ルール入門", "駒の動きから反則まで、8章で図解"),
     "home": ("AIと対局", "入門から伝説3まで、11段階の強さ"),
     "board": ("将棋盤", "1台の端末で、ふたりで指す"),
     "online": ("オンライン対局", "全国の相手や友だちと"),

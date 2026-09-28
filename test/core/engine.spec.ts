@@ -270,6 +270,82 @@ describe("game end detection", () => {
     expect(ended!.winner).toBe(GOTE);
   });
 
+  it("does not call it perpetual check when the checking side made a quiet move in the cycle", () => {
+    // The position that repeats four times is always the one right after a
+    // rook check, but sente also shuffles its king (no check) inside every
+    // cycle: under JSA rules that is a plain sennichite (draw).
+    let state = buildState({
+      pieces: [
+        { x: 4, y: 0, type: "OU", owner: GOTE },
+        { x: 0, y: 0, type: "KI", owner: GOTE },
+        { x: 3, y: 3, type: "HI", owner: SENTE },
+        { x: 8, y: 8, type: "OU", owner: SENTE },
+      ],
+      currentPlayer: SENTE,
+    });
+    const cycle: Move[] = [
+      { type: "move", fromX: 3, fromY: 3, toX: 4, toY: 3 }, // sente rook checks
+      { type: "move", fromX: 4, fromY: 0, toX: 3, toY: 0 }, // gote king evades
+      { type: "move", fromX: 8, fromY: 8, toX: 8, toY: 7 }, // sente king: quiet
+      { type: "move", fromX: 0, fromY: 0, toX: 0, toY: 1 }, // gote gold
+      { type: "move", fromX: 4, fromY: 3, toX: 3, toY: 3 }, // sente rook checks again
+      { type: "move", fromX: 3, fromY: 0, toX: 4, toY: 0 }, // gote king back
+      { type: "move", fromX: 8, fromY: 7, toX: 8, toY: 8 }, // sente king back: quiet
+      { type: "move", fromX: 0, fromY: 1, toX: 0, toY: 0 }, // gote gold back
+    ];
+    let ended: ReturnType<typeof applyMove> | null = null;
+    outer: for (let i = 0; i < 5; i++) {
+      for (const move of cycle) {
+        const result = applyMove(state, move);
+        state = result.state;
+        if (result.gameOver) {
+          ended = result;
+          break outer;
+        }
+      }
+    }
+    expect(ended).not.toBeNull();
+    expect(ended!.state.isCheck).toBe(true); // the repeated position is a checked one
+    expect(ended!.resultReason).toBe("sennichite");
+    expect(ended!.winner).toBe("draw");
+  });
+
+  it("detects perpetual check even when the repeated position is not a checked one", () => {
+    // Gote to move, already in check. The first position to repeat four times
+    // is the one after the king's escape (no check), yet sente checked with
+    // every move of the cycle: sente loses.
+    let state = buildState({
+      pieces: [
+        { x: 4, y: 0, type: "OU", owner: GOTE },
+        { x: 4, y: 3, type: "HI", owner: SENTE },
+        { x: 8, y: 8, type: "OU", owner: SENTE },
+      ],
+      currentPlayer: GOTE,
+      isCheck: true,
+    });
+    const cycle: Move[] = [
+      { type: "move", fromX: 4, fromY: 0, toX: 3, toY: 0 }, // gote king escapes
+      { type: "move", fromX: 4, fromY: 3, toX: 3, toY: 3 }, // sente rook checks
+      { type: "move", fromX: 3, fromY: 0, toX: 4, toY: 0 }, // gote king escapes back
+      { type: "move", fromX: 3, fromY: 3, toX: 4, toY: 3 }, // sente rook checks
+    ];
+    let ended: ReturnType<typeof applyMove> | null = null;
+    outer: for (let i = 0; i < 5; i++) {
+      for (const move of cycle) {
+        const result = applyMove(state, move);
+        state = result.state;
+        if (result.gameOver) {
+          ended = result;
+          break outer;
+        }
+      }
+    }
+    expect(ended).not.toBeNull();
+    expect(ended!.state.isCheck).toBe(false);
+    expect(ended!.resultReason).toBe("perpetual_check");
+    expect(ended!.winner).toBe(GOTE);
+  });
+
   it("rejects a move that leaves the king in check", () => {
     // Sente king pinned against a gote rook: moving the blocking gold
     // sideways would expose the king.

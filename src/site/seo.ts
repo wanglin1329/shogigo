@@ -16,6 +16,8 @@ export interface PageSeo {
   noindex?: boolean
   /** Pages with a board on first screen: fetch the piece font along with the CSS. */
   pieceFont?: boolean
+  /** 'article' for guide chapters. */
+  ogType?: 'website' | 'article'
 }
 
 export const DEFAULT_OG_IMAGE = '/og/home.jpg'
@@ -28,7 +30,7 @@ export function pageHead(seo: PageSeo, jsonLd: readonly object[] = []) {
       { title: seo.title },
       { name: 'description', content: seo.description },
       ...(seo.noindex ? [{ name: 'robots', content: 'noindex' }] : []),
-      { property: 'og:type', content: 'website' },
+      { property: 'og:type', content: seo.ogType ?? 'website' },
       { property: 'og:site_name', content: SITE_NAME },
       { property: 'og:locale', content: 'ja_JP' },
       { property: 'og:title', content: seo.title },

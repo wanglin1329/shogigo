@@ -11,7 +11,7 @@ import { LASTMOD } from '../../src/content/lastmod'
 import { ONLINE_COPY } from '../../src/content/online'
 import type { PageCopy } from '../../src/content/types'
 import { absoluteUrl } from '../../src/site/config'
-import { robotsTxt, sitemapPaths, sitemapXml } from '../../src/site/sitemap'
+import { robotsTxt, sitemapEntries, sitemapXml } from '../../src/site/sitemap'
 
 const PAGES: Record<string, PageCopy> = { '/': HOME_COPY, '/board': BOARD_COPY, '/online': ONLINE_COPY }
 const BANNED = ['登録', 'ダウンロード', 'インストール']
@@ -75,10 +75,13 @@ describe('sitemap and robots', () => {
 
   it('lists every dated page with its own date, and nothing else', () => {
     const xml = sitemapXml()
-    for (const path of sitemapPaths()) {
-      expect(xml).toContain(`<loc>${absoluteUrl(path)}</loc>\n    <lastmod>${LASTMOD[path]}</lastmod>`)
+    const entries = sitemapEntries()
+    for (const { path, lastmod } of entries) {
+      expect(xml).toContain(`<loc>${absoluteUrl(path)}</loc>\n    <lastmod>${lastmod}</lastmod>`)
+      if (path in LASTMOD && path !== '/guide') expect(lastmod).toBe(LASTMOD[path as keyof typeof LASTMOD])
     }
-    expect(xml.match(/<url>/g)?.length).toBe(sitemapPaths().length)
+    expect(xml.match(/<url>/g)?.length).toBe(entries.length)
+    expect(new Set(entries.map((e) => e.path)).size).toBe(entries.length)
     expect(xml).not.toContain('/records')
     expect(xml).not.toContain('/tsume')
   })
@@ -86,5 +89,14 @@ describe('sitemap and robots', () => {
   it('robots.txt keeps crawlers out of the API and points to the sitemap', () => {
     expect(robotsTxt()).toContain('Disallow: /api/')
     expect(robotsTxt()).toContain(`Sitemap: ${absoluteUrl('/sitemap.xml')}`)
+  })
+})
+
+describe('guide table of contents date', () => {
+  it('is the newest of its own date and the chapters', async () => {
+    const { CHAPTERS } = await import('../../src/content/guide/chapters')
+    const entry = sitemapEntries().find((e) => e.path === '/guide')!
+    const newest = [LASTMOD['/guide'], ...CHAPTERS.map((c) => c.updatedAt)].sort().at(-1)
+    expect(entry.lastmod).toBe(newest)
   })
 })

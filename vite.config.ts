@@ -26,7 +26,10 @@ export default defineConfig({
         enabled: true,
         // Link crawling is on by default, so SSR-only pages linked from a
         // prerendered page would get frozen at build time without this filter.
-        filter: (page) => !isSsrOnly(page.path) && !isPublicFile(page.path),
+        // A folder's index route is also listed as '/guide/': skip it, or
+        // guide/index.html would duplicate guide.html (the canonical /guide).
+        filter: (page) =>
+          !isSsrOnly(page.path) && !isPublicFile(page.path) && (page.path === '/' || !page.path.endsWith('/')),
         // `/board` → board.html (no trailing slash), matching wrangler's
         // assets.html_handling = "auto-trailing-slash".
         autoSubfolderIndex: false,

@@ -2,6 +2,8 @@
 // Copyright 2025~ Yuki Lab
 // Copyright 2026 the shogi project contributors
 // Modified 2026-09-27: moved to src/games/shogi/core/engine; code unchanged.
+// Modified 2026-09-28: 連続王手の千日手 now requires check on every move of the
+// checking side in the cycle (it only looked at the repeated positions).
 
 // A small shogi rules engine extracted from the frontend logic (shogi.js),
 // used for server-authoritative validation in online matches.
@@ -735,38 +737,29 @@ function checkSennichite(state: GameState): {
     }
   }
 
-  // Keep consistent with frontend implementation.
   if (count >= 4) {
-    let isConsecutiveCheck = true;
-    let checkingPlayer: Player | null = null;
-
-    for (let i = firstOccurrenceIndex; i < state.positionHistory.length; i++) {
-      if (state.positionHistory[i] !== currentHash) continue;
-
-      const wasCheck = state.checkHistory[i];
-      if (!wasCheck) {
-        isConsecutiveCheck = false;
-        break;
+    // 連続王手の千日手 (JSA rules): one side gave check with every one of its
+    // moves from the first occurrence of the position to the fourth. Checks
+    // only at the repeated positions are not enough: a quiet move anywhere in
+    // the cycle makes it a plain sennichite.
+    // Entry i (i >= 1 within the cycle) is the position after a move; the
+    // mover is the opponent of the side to move there, and checkHistory[i]
+    // says whether that move gave check.
+    const checkedEveryMove = (side: Player): boolean => {
+      for (let i = firstOccurrenceIndex + 1; i < state.positionHistory.length; i++) {
+        if (getOpponent(state.turnHistory[i]) === side && !state.checkHistory[i]) return false;
       }
-
-      const checkedPlayer = state.turnHistory[i] ?? state.currentPlayer;
-      const playerWhoChecked = getOpponent(checkedPlayer);
-
-      if (checkingPlayer === null) {
-        checkingPlayer = playerWhoChecked;
-      } else if (checkingPlayer !== playerWhoChecked) {
-        isConsecutiveCheck = false;
-        break;
-      }
-    }
-
-    if (isConsecutiveCheck && !state.isCheck) {
-      isConsecutiveCheck = false;
-    }
+      return true;
+    };
+    const senteChecked = checkedEveryMove(SENTE);
+    const goteChecked = checkedEveryMove(GOTE);
+    // Both sides checking with every move (mutual perpetual check) is not
+    // settled by the JSA rules text; this site treats it as a plain sennichite.
+    const checkingPlayer: Player | null = senteChecked === goteChecked ? null : senteChecked ? SENTE : GOTE;
 
     return {
       isSennichite: true,
-      isConsecutiveCheck,
+      isConsecutiveCheck: checkingPlayer !== null,
       checkingPlayer,
     };
   }

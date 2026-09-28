@@ -13,6 +13,8 @@ export const LASTMOD = {
   '/terms': '2026-09-28',
   '/contact': '2026-09-28',
   '/license': '2026-09-28',
+  /** The guide's table of contents; each chapter carries its own updatedAt. */
+  '/guide': '2026-09-28',
 } as const satisfies Record<string, string>
 
 export type SitePath = keyof typeof LASTMOD

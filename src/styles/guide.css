@@ -1,0 +1,283 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+
+/* Rules guide: board figures and chapter layout (docs/PLAN.md §9.7). */
+
+/* ------------------------------------------------------------------ board figures */
+.diagram {
+  margin: 20px 0 24px;
+  text-align: center;
+}
+.diagram-board {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+.diagram-wood {
+  fill: var(--wood-hi);
+  stroke: var(--frame);
+  stroke-width: 2.5;
+}
+.diagram-grid {
+  stroke: var(--grid-line);
+  stroke-width: 1;
+}
+.diagram-star {
+  fill: var(--grid-line);
+}
+.diagram-coord {
+  fill: var(--ink-soft);
+  font-size: 12px;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Hiragino Sans',
+    sans-serif;
+}
+.diagram-piece {
+  fill: var(--piece-face);
+  stroke: var(--piece-edge);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+.diagram-glyph {
+  fill: var(--ink);
+  font-family: var(--piece-font);
+  font-size: 22px;
+  font-weight: 700;
+}
+.diagram-glyph-promoted {
+  fill: var(--shu);
+}
+.diagram-target {
+  fill: rgb(179 57 45 / 0.16);
+  stroke: rgb(179 57 45 / 0.55);
+  stroke-width: 1.5;
+}
+.diagram-dot {
+  fill: var(--shu);
+  opacity: 0.8;
+}
+.diagram-bad {
+  stroke: var(--shu-deep);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  fill: none;
+}
+.diagram-arrow {
+  stroke: var(--shu-deep);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.diagram-arrowhead {
+  fill: var(--shu-deep);
+}
+.diagram-hands {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.diagram figcaption {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.diagram-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0 12px;
+  align-items: start;
+}
+.diagram-row .diagram {
+  margin: 12px 0;
+}
+
+/* ------------------------------------------------------------------ chapter page */
+.guide-crumbs {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.guide-crumbs a {
+  color: inherit;
+}
+.guide-toc {
+  margin: 16px 0 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.55);
+  font-size: 14px;
+}
+.guide-toc ol {
+  margin: 0;
+  padding-left: 1.4em;
+  list-style: decimal;
+}
+.guide-toc a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.guide-toc a:hover {
+  text-decoration: underline;
+}
+.site-page section[aria-labelledby] h2 {
+  scroll-margin-top: 16px;
+}
+.guide-note {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--shu);
+  border-radius: 0 10px 10px 0;
+  background: #f8efdf;
+}
+.guide-note strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+.guide-note p {
+  margin: 0;
+  font-size: 14px;
+}
+.site-page caption {
+  caption-side: bottom;
+  padding-top: 6px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-align: left;
+}
+.guide-takeaway ul {
+  padding: 14px 16px 14px 2.2em;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.guide-pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 28px 0 0;
+}
+.guide-pager a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+.guide-pager a span {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 400;
+}
+.guide-pager-next {
+  text-align: right;
+}
+.guide-pager a:hover {
+  border-color: #b8a988;
+}
+.guide-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f1e6d2;
+}
+.guide-cta p {
+  margin: 0;
+}
+.guide-cta .btn {
+  display: inline-flex;
+  align-items: center;
+  color: #fff;
+  text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ table of contents (/guide) */
+.guide-cards {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 0;
+  list-style: none;
+}
+.site-page .guide-cards {
+  padding-left: 0;
+  list-style: none;
+}
+.guide-card {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.site-page a.guide-card {
+  color: var(--ink);
+  text-decoration: none;
+}
+.guide-card:hover {
+  border-color: #b8a988;
+}
+.guide-card:active {
+  transform: translateY(1px);
+}
+.guide-card-figure .diagram {
+  margin: 0;
+}
+.guide-card-figure figcaption {
+  display: none;
+}
+.guide-card-body {
+  display: grid;
+  gap: 2px;
+}
+.guide-card-no {
+  color: var(--shu-deep);
+  font-size: 12px;
+  font-weight: 600;
+}
+.guide-card-title {
+  font-family: var(--display-font);
+  font-size: 18px;
+  font-weight: 600;
+}
+.guide-card-summary {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-card,
+  .guide-pager a {
+    transition: none;
+  }
+}
+
+/* Row headers (first column of guide tables): bold, but they wrap like cells. */
+.site-page tbody th {
+  background: transparent;
+  font-weight: 600;
+  white-space: normal;
+}

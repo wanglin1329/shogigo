@@ -16,4 +16,4 @@ pnpm build            # vite build（プリレンダリング込み）+ scripts/
 pnpm preview          # 本番ビルドを http://localhost:3161 で確認
 ```
 
-計画と設計は [docs/PLAN.md](docs/PLAN.md)、調査資料は `docs/research/`。
+計画と設計は [docs/PLAN.md](docs/PLAN.md)。

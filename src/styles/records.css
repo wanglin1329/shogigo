@@ -24,7 +24,7 @@
   gap: 4px;
   padding: 4px;
   border-radius: 999px;
-  background: #e6dcc8;
+  background: var(--track);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -66,7 +66,7 @@
 }
 .records-summary div {
   padding: 12px;
-  border: 1px solid #ddd0b6;
+  border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);
   text-align: center;
@@ -93,14 +93,14 @@
   gap: 12px;
   min-height: 56px;
   padding: 8px 12px;
-  border: 1px solid #e3d8c3;
+  border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);
   color: var(--ink);
   text-decoration: none;
 }
 a.records-row:hover {
-  border-color: #c9b894;
+  border-color: var(--line-hover);
 }
 .records-result {
   flex: none;
@@ -112,16 +112,16 @@ a.records-row:hover {
   text-align: center;
 }
 .records-win {
-  background: #e3f1e6;
-  color: #2f6b42;
+  background: var(--good-bg);
+  color: var(--good-fg);
 }
 .records-lose {
-  background: #fbe3df;
-  color: #7a241c;
+  background: var(--bad-bg);
+  color: var(--bad-fg);
 }
 .records-draw,
 .records-board {
-  background: #efe6d5;
+  background: var(--sunken);
   color: var(--ink-soft);
 }
 .records-main {

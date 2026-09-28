@@ -27,6 +27,7 @@
 - 新しい公開ページは `LASTMOD` に足す（sitemap に入る）。sitemap.xml / robots.txt は server route をビルド時に静的化（`vite.config.ts` の `pages`）
 - workers.dev は noindex（静的ファイルは `public/_headers` のホスト指定、Worker の応答は `server.ts`）。独自ドメイン確定後は `workers_dev: false`
 - OG 画像・アイコンは `scripts/og/generate.py` で作って入庫（CI では作らない）
+- 色は `styles.css` のトークンだけを使う。トークンはライトと `:root[data-theme='dark']` の2か所に必ず両方書く。盤・駒台の上の文字や駒の字は `--piece-ink`（ダークでも黒のまま）、濃い地に白文字の部品は `--inverse-bg/fg`。テーマは `<html data-theme>` を `src/site/theme.ts` の早期スクリプトが描画前に設定する
 - 配色は暖色系のみ、アクセントは朱（`--shu` / `--shu-deep`）の1色。灰色は `--ink-soft`、影は `--shadow-rgb`（紙の色味）で、`rgb(0 0 0 / …)` や寒色の灰を持ち込まない。アイコンは `src/site/icons.tsx`（⚙✕▸ などの文字で代用しない）
 - ルール入門は `src/content/guide/`（章ごとに `chapters/0N-<slug>.ts`、ファイル名の slug は章の slug と同じにする：check-build がそこから期待ページを作る）。章の日付は各章の `updatedAt`。駒の動きの点は `moveMarks()`（ルールエンジンの動き表）から作り、手書きしない
 - 「本作では」と書く事実は必ずコードで確かめる。一般ルールは日本将棋連盟の対局規則に合わせる（入玉宣言の点数条件は未確認なので書いていない）

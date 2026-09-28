@@ -72,24 +72,24 @@
 }
 @media (hover: hover) {
   .btn-primary:not(:disabled):hover {
-    background: #9f3127;
+    background: var(--shu-hover);
   }
   .btn-step:not(:disabled):hover {
-    background: #3a3129;
+    background: var(--btn-dark-hover);
   }
   .btn-quiet:not(:disabled):hover {
-    background: #dcd2bf;
+    background: var(--quiet-hover);
   }
   .btn-danger:not(:disabled):hover {
     background: #661d16;
   }
   .chip:not(:disabled):hover,
   .level-button:hover {
-    border-color: #b8a988;
-    background: #fbf6ec;
+    border-color: var(--line-hover);
+    background: var(--field-hover);
   }
   .mode-tab:not([aria-current='page']):hover {
-    background: rgb(255 255 255 / 0.55);
+    background: var(--tab-hover);
   }
 }
 .btn:not(:disabled):active,
@@ -116,8 +116,8 @@
   z-index: 60;
   padding: 10px 14px;
   border-radius: 10px;
-  background: var(--ink);
-  color: #fff;
+  background: var(--inverse-bg);
+  color: var(--inverse-fg);
   font-size: 14px;
   text-decoration: none;
 }

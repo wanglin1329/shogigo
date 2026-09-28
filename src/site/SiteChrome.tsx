@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 
 import { SITE_NAME } from './brand'
 import { CONTACT_EMAIL, SOURCE_URL } from './config'
+import { ThemeSelect } from './ThemeSelect'
 
 /** The brand mark: a shogi piece (pentagon) with 将. Same drawing as public/favicon.svg. */
 export function PieceMark({ size = 28 }: { size?: number }) {
@@ -51,7 +52,10 @@ export function SiteFooter() {
           GitHub
         </a>
       </nav>
-      <p className="site-footer-copy">© 2026 {SITE_NAME}</p>
+      <div className="site-footer-bottom">
+        <p className="site-footer-copy">© 2026 {SITE_NAME}</p>
+        <ThemeSelect />
+      </div>
     </footer>
   )
 }

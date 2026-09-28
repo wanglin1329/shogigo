@@ -40,7 +40,7 @@
   max-width: 1280px;
   margin: 48px auto 0;
   padding: 24px 16px 32px;
-  border-top: 1px solid #e3d8c3;
+  border-top: 1px solid var(--line);
   color: var(--ink-soft);
   font-size: 13px;
 }
@@ -80,7 +80,7 @@
 .guide h2 {
   margin: 36px 0 10px;
   padding-bottom: 6px;
-  border-bottom: 2px solid #e3d8c3;
+  border-bottom: 2px solid var(--line);
   font-size: 19px;
   line-height: 1.45;
 }
@@ -129,13 +129,13 @@
 .guide th,
 .guide td {
   padding: 8px 10px;
-  border: 1px solid #e3d8c3;
+  border: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
 }
 .site-page th,
 .guide th {
-  background: #efe6d4;
+  background: var(--sunken);
   white-space: nowrap;
 }
 .table-scroll {
@@ -158,4 +158,37 @@
 .site-header-nav {
   display: flex;
   gap: 14px;
+}
+
+/* Text inputs follow the theme (checkboxes and radios keep the native look). */
+textarea,
+select,
+input:not([type='checkbox']):not([type='radio']) {
+  background-color: var(--field);
+  color: var(--ink);
+}
+
+/* Footer: copyright and the theme choice on one line. */
+.site-footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+.site-footer-bottom .site-footer-copy {
+  margin: 0;
+}
+.theme-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.theme-select select {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font-size: 13px;
 }

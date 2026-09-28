@@ -116,7 +116,7 @@
   color: var(--ink-soft);
 }
 .waza-card-first {
-  color: var(--shu);
+  color: var(--shu-text);
   font-size: 12px;
   font-weight: 700;
 }

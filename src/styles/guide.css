@@ -41,13 +41,13 @@
   stroke-linejoin: round;
 }
 .diagram-glyph {
-  fill: var(--ink);
+  fill: var(--piece-ink);
   font-family: var(--piece-font);
   font-size: 22px;
   font-weight: 700;
 }
 .diagram-glyph-promoted {
-  fill: var(--shu);
+  fill: var(--piece-promoted);
 }
 .diagram-target {
   fill: rgb(179 57 45 / 0.16);
@@ -55,22 +55,22 @@
   stroke-width: 1.5;
 }
 .diagram-dot {
-  fill: var(--shu);
+  fill: var(--board-mark);
   opacity: 0.8;
 }
 .diagram-bad {
-  stroke: var(--shu-deep);
+  stroke: var(--board-mark);
   stroke-width: 3.5;
   stroke-linecap: round;
   fill: none;
 }
 .diagram-arrow {
-  stroke: var(--shu-deep);
+  stroke: var(--board-mark);
   stroke-width: 3;
   stroke-linecap: round;
 }
 .diagram-arrowhead {
-  fill: var(--shu-deep);
+  fill: var(--board-mark);
 }
 .diagram-hands {
   display: flex;
@@ -110,7 +110,7 @@
   margin: 16px 0 8px;
   padding: 12px 16px;
   border-radius: 12px;
-  background: rgb(255 255 255 / 0.55);
+  background: var(--toc-bg);
   font-size: 14px;
 }
 .guide-toc ol {
@@ -133,7 +133,7 @@
   padding: 12px 16px;
   border-left: 3px solid var(--shu);
   border-radius: 0 10px 10px 0;
-  background: #f8efdf;
+  background: var(--sunken);
 }
 .guide-note strong {
   display: block;
@@ -185,7 +185,7 @@
   text-align: right;
 }
 .guide-pager a:hover {
-  border-color: #b8a988;
+  border-color: var(--line-hover);
 }
 .guide-cta {
   display: flex;
@@ -196,7 +196,7 @@
   margin: 20px 0 0;
   padding: 14px 16px;
   border-radius: 12px;
-  background: #f1e6d2;
+  background: var(--sunken);
 }
 .guide-cta p {
   margin: 0;
@@ -238,7 +238,7 @@
   text-decoration: none;
 }
 .guide-card:hover {
-  border-color: #b8a988;
+  border-color: var(--line-hover);
 }
 .guide-card:active {
   transform: translateY(1px);

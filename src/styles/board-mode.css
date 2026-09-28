@@ -8,7 +8,7 @@
 .import-field textarea {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid #d6cab2;
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   font: 13px/1.5 ui-monospace, 'SFMono-Regular', Menlo, monospace;
   resize: vertical;
@@ -30,7 +30,7 @@
   margin: 10px 0 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #e3f1e6;
+  background: var(--good-bg);
   font-size: 13px;
 }
 

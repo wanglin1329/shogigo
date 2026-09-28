@@ -969,6 +969,71 @@ interface Section {
   - 实测（好友对战，对手用脚本，修改前后各一次）：点击后约 10ms 滑动一次，确认时不再动；对手的着手到达时滑动一次。
 - ⚠️ `desktop.css` 的选择器以 `body` 开头：`@import` 进来的 CSS 在层叠顺序上排在 `styles.css` 正文之前，同权重时正文里的 `.game` 会覆盖它。
 
+## 9.10 深色模式方案（2026-09-28，实现前）
+
+**切换方式**
+- 三档：「自動」（跟随系统，默认）/「ライト」/「ダーク」。
+- 入口放在页脚的下拉菜单。taste-skill 不建议用太阳 / 月亮开关；另外设置对话框只有 AI 页面有，放在页脚才能全站通用。
+- 选择存在 localStorage `sg.theme`；「自動」时不存值。
+
+**避免加载时闪一下**
+- `<head>` 里放一段很小的内联脚本，在绘制前给 `<html>` 加上 `data-theme="light|dark"`。
+- 「自動」不加属性，交给 `@media (prefers-color-scheme: dark)`。
+- 预渲染的 HTML 不含这个属性；属性只由内联脚本设置，React 不管理 `<html>` 上的这个属性，所以不会出现水合不一致。
+
+**token 方案**（全部是语义 token，页面和组件只引用 token）
+- 界面：`--paper`（页面底）、`--card`、`--card-2`（较浅的面）、`--line`、`--ink`、`--ink-soft`，以及用于 toast、横幅、深色按钮的反色组 `--inverse-bg` / `--inverse-fg`。
+- 强调色：`--shu` / `--shu-deep` / `--focus`，以及朱色的淡底和淡边 `--shu-tint`。深色模式下提高亮度，保证 AA 对比度。
+- 棋盘：`--wood-hi`、`--wood-lo`、`--grid-line`、`--frame`、`--tray`、`--tray-edge`、`--piece-face`、`--piece-edge`，另新增**永远是深色的 `--piece-ink`**，因为驹字画在浅色驹面上。深色模式下木色和驹面都稍微压暗，减少刺眼，但仍然像木头。
+- 状态色：段位徽章 4 档、棋钟警告色、成功 / 错误提示。深色模式下各配一组。
+- 页面底纹：和纸纹理在深色模式下改用更低的不透明度、偏亮的颗粒。
+- `color-scheme: light | dark` 同步切换，表单控件也跟着换。
+- `theme-color` 输出两个带 `media` 的 meta。
+
+**需要改的地方**
+- `styles.css` 及 `styles/*.css` 里写死的约 120 处颜色，全部换成 token。
+- `SiteChrome` 的驹形 logo 和 `FirstMoveDemo` 里内联 SVG 的颜色，改成 CSS 类。
+- OG 图和 favicon 不改（静态图片）。
+
+**验证**
+- 全部页面在两种主题下都截图：对局、联机大厅、练习对局、结果弹窗、设置、规则入门（局面图）、战绩、法务页、404。
+- 用脚本检查主要文字的对比度（AA）。
+- 手动选择主题后刷新，不能先闪出另一种主题。
+- 手机和桌面都要看。
+
+**codex review 后的调整**：
+- **早期脚本**：`<HeadContent/>` 之后放 `ScriptOnce`（会在解析 HTML 时执行，并把自己从 DOM 中移除），`<html>` 加 `suppressHydrationWarning`。
+- **简化**：脚本总是把选择解析成具体主题写进 `data-theme`：选了「自動」就按 `matchMedia('(prefers-color-scheme: dark)')` 决定，React 端监听系统主题变化。这样 CSS 只需要一份 `:root[data-theme='dark']` 深色块，不用和 media 查询写两遍。没开 JS 时显示浅色。
+- **theme-color**：只保留一条（TanStack 按 `name` 去重，两条带 `media` 的会丢一条），由脚本和下拉菜单按实际主题改写 `content`。
+- **存储**：`sg.theme` 是 JSON 字符串，只接受 light / dark；选「自動」时删除这个键。页脚的下拉菜单在服务端渲染和客户端首次渲染时都显示「自動」，挂载后再读取偏好。
+- **成对的 token**：
+  - 固定浅底上的深字：驹字 `--piece-ink`；木盘、驹台上的字保持原来写死的深色；
+  - 以前用 `--ink` 当背景的地方（横幅、toast、棋钟、跳转链接）改用 `--inverse-bg` / `--inverse-fg`；
+  - 以前写死白底的地方（chip、输入框、升变选项、等级选项）改用 `--field`。二维码的白底保持不变（扫描需要）。
+
+**实现（2026-09-28）**：
+- 新增 `src/site/theme.ts`（早期脚本、偏好读写、应用主题）和 `src/site/ThemeSelect.tsx`（页脚的「表示テーマ」）。
+- 在 `__root.tsx` 里，`ScriptOnce` 放在 `<HeadContent/>` 之后，`<html>` 加了 `suppressHydrationWarning`。
+- `styles.css` 的 token 改为浅色 / 深色两块，写死的颜色全部换成语义 token。只保留两种写死的颜色：「固定深底配浅字」（棋钟警告、横幅上的强调字等）和徽章自带的配色，它们在两种主题下都成立。
+- 按 review 意见补的 token：
+  - `--piece-ink`（驹字、局面图的驹字）；
+  - `--inverse-bg/fg`（横幅、toast、棋钟、跳转链接）；
+  - `--field`（chip、输入框、升变选项、等级选项）；
+  - `--overlay-rgb`（图标按钮的悬停）；
+  - `--neutral-mark`（将棋盘结果弹窗的顶边）。
+- 对比度按脚本计算，主要组合两种主题都达到 AA：正文最低 5.3，按钮白字最低 5.1。
+- codex review 后修正：
+  - BLOCKER：局面图的箭头和 ×，深色下是亮粉色，画在浅木盘上只有 1.2:1。改用 `--board-mark`（深色主题下是暗红，对比度 4.9）。
+  - WARN 全部修正：
+    - 棋谱当前行底色 `--kifu-current`；
+    - 卡片上的朱色小字 `--shu-text`；
+    - 成驹的字 `--piece-promoted`；
+    - 深色下主按钮的悬停色调暗；
+    - 驹台文字 `--tray-ink`；
+    - 跨标签页同步（监听 `storage` 事件）。
+  - NIT 全部修正：目录底色 `--toc-bg`（浅色恢复原来的半透明白）；盘上格线 `--sq-line` 和 `--thumb-line`；深色下的禁用文字调亮。
+- 实测：预渲染的 `index.html` 里主题脚本位于 `<head>`；选择后刷新、切换页面都会保留；两种主题的手机端和桌面端都截图确认过（对局、大厅、规则入门的局面图、设置、导入、结果弹窗、战绩）。
+
 ## 10. 验证方式
 
 - **core**：vitest。

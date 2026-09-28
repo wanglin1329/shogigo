@@ -18,9 +18,6 @@
   src: url('/fonts/shippori-mincho-b1-700-pieces.woff2') format('woff2');
 }
 
-:root {
-  color-scheme: light;
-}
 
 body {
   margin: 0;
@@ -35,33 +32,141 @@ body {
 }
 
 /* ------------------------------------------------------------------ tokens */
+/* Colour tokens come in pairs for the light and the dark theme
+   (<html data-theme>, set before the first paint: src/site/theme.ts).
+   Components use these names only — no raw colours for surfaces or text. */
 :root {
+  color-scheme: light;
+  /* Surfaces */
   --paper: #f4efe4;
   --card: #fffdf8;
+  /* Inputs, chips, option buttons. */
+  --field: #ffffff;
+  --field-hover: #fbf6ec;
+  /* Recessed panels: clocks, table headers, notes. */
+  --sunken: #f3ecdf;
+  /* The track behind segmented tabs. */
+  --track: #e6dcc8;
+  --progress-bg: #e2d6bf;
+  --quiet: #e4dccb;
+  --quiet-hover: #dcd2bf;
+  --disabled-bg: #e6ddcc;
+  --disabled-fg: #857a6c;
   /* Warm ink and grays only: they sit on warm paper (no cool grays). */
   --ink: #2a231c;
   --ink-soft: #6b6156;
   --line: #ddd0b6;
+  --line-strong: #cfc3ab;
+  --line-hover: #b8a988;
+  /* Neutral marker (result dialog of a two-player game). */
+  --neutral-mark: #6b6156;
+  /* Dark surfaces with light text (banners, toasts, running clock). */
+  --inverse-bg: #2a231c;
+  --inverse-fg: #ffffff;
+  --btn-dark: #4a4037;
+  --btn-dark-hover: #3a3129;
+  /* The one accent. --shu-deep: links, hover, focus ring. */
+  --shu: #b3392d;
+  --shu-hover: #9f3127;
+  --shu-deep: #8e2c22;
+  --shu-tint: #fbe9e5;
+  /* Vermilion text on cards / paper (warnings, deltas). */
+  --shu-text: #b3392d;
+  --gold: #e6b12f;
+  --focus: var(--shu-deep);
+  /* States */
+  --notice-bg: #fff1d6;
+  --good-bg: #e3f1e6;
+  --good-fg: #2f6b42;
+  --bad-bg: #fbe3df;
+  --bad-fg: #7a241c;
+  /* Shadows carry the paper's hue, never plain black; overlays tint controls on hover. */
+  --shadow-rgb: 60 36 10;
+  --overlay-rgb: 60 36 10;
+  --tab-hover: rgb(255 255 255 / 0.55);
+  --backdrop: rgb(24 18 10 / 0.5);
+  /* The board stays wood in both themes. Piece glyphs are always dark ink on
+     a light face (--piece-ink never follows --ink). */
   --wood-hi: #ecca8e;
   --wood-lo: #d7a95f;
   --grid-line: #7a5a33;
   --frame: #5e4122;
   --tray: #d3b27a;
   --tray-edge: #9c7a45;
-  /* The one accent. --shu-deep: links, hover, focus ring. */
-  --shu: #b3392d;
-  --shu-deep: #8e2c22;
-  --gold: #e6b12f;
-  --focus: var(--shu-deep);
-  /* Shadows carry the paper's hue, never plain black. */
-  --shadow-rgb: 60 36 10;
   --piece-face: #fbf1d6;
+  --piece-face-lo: #f0dfb6;
   --piece-edge: #b99357;
+  --piece-ink: #1b1b1b;
+  /* Promoted pieces' red glyph, marks drawn on the wood (arrows, crosses), text on the tray, square lines. */
+  --piece-promoted: #b3392d;
+  --board-mark: #8e2c22;
+  --tray-ink: #4a3a28;
+  --sq-line: rgb(122 90 51 / 0.75);
+  --thumb-line: rgb(122 90 51 / 0.5);
+  /* Current move in the kifu list; the rules guide's table of contents. */
+  --kifu-current: rgb(255 200 40 / 0.45);
+  --toc-bg: rgb(255 255 255 / 0.55);
   /* One cell of the board; everything on the board scales from it. */
   --cell: clamp(30px, calc((100vw - 32px - 18px) / 9), 50px);
   --piece-font: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   /* Page headings: the system mincho (nothing to download), as on a printed board-game guide. */
   --display-font: 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho', 'Noto Serif JP', serif;
+}
+
+/* Dark theme: warm charcoal, the board a little dimmer so it does not glare. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #1b1713;
+  --card: #262019;
+  --field: #2e2720;
+  --field-hover: #352d25;
+  --sunken: #211c17;
+  --track: #2e2720;
+  --progress-bg: #3a3128;
+  --quiet: #3a3128;
+  --quiet-hover: #453a2f;
+  --disabled-bg: #2c251e;
+  --disabled-fg: #948878;
+  --ink: #eee5d7;
+  --ink-soft: #b3a794;
+  --line: #3b3229;
+  --line-strong: #4b4136;
+  --line-hover: #6a5d4c;
+  --neutral-mark: #6a5d4c;
+  --inverse-bg: #3d3329;
+  --inverse-fg: #f6efe3;
+  --btn-dark: #564a3e;
+  --btn-dark-hover: #62554a;
+  --shu: #c0443a;
+  --shu-hover: #a93a2f;
+  --shu-deep: #f08a78;
+  --shu-tint: rgb(192 68 58 / 0.22);
+  --notice-bg: #3a2f1c;
+  --good-bg: #1f3326;
+  --good-fg: #93d4a6;
+  --bad-bg: #3d211d;
+  --bad-fg: #f3a597;
+  --shadow-rgb: 0 0 0;
+  --overlay-rgb: 255 244 230;
+  --tab-hover: rgb(255 255 255 / 0.08);
+  --backdrop: rgb(0 0 0 / 0.6);
+  --wood-hi: #d2ae72;
+  --wood-lo: #bc9352;
+  --grid-line: #5c4326;
+  --frame: #3e2b16;
+  --tray: #a88a58;
+  --tray-edge: #7a5d33;
+  --piece-face: #ece0c4;
+  --piece-face-lo: #dcca9f;
+  --piece-edge: #a4834d;
+  --piece-promoted: #9a2c22;
+  --board-mark: #7a1f16;
+  --tray-ink: #2a1e10;
+  --sq-line: rgb(70 48 24 / 0.85);
+  --thumb-line: rgb(70 48 24 / 0.6);
+  --kifu-current: rgb(230 177 47 / 0.15);
+  --toc-bg: #211c17;
+  --shu-text: #f08a78;
 }
 
 body {
@@ -116,7 +221,7 @@ body {
   gap: 8px;
   min-height: 44px;
   padding: 6px 14px;
-  border: 1px solid #cfc3ab;
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: var(--card);
   color: var(--ink);
@@ -141,10 +246,10 @@ body {
   cursor: pointer;
 }
 .icon-button:hover {
-  background: rgb(var(--shadow-rgb) / 0.06);
+  background: rgb(var(--overlay-rgb) / 0.08);
 }
 .icon-button[aria-pressed='true'] {
-  background: rgb(var(--shadow-rgb) / 0.1);
+  background: rgb(var(--overlay-rgb) / 0.12);
 }
 
 .board-area {
@@ -198,7 +303,7 @@ body {
 .hand-empty {
   font-size: 12px;
   /* Opaque dark wood: ≥ 4.5:1 on the tray. */
-  color: #4a3a28;
+  color: var(--tray-ink);
 }
 .hand-piece {
   position: relative;
@@ -230,7 +335,7 @@ body {
   min-width: 16px;
   padding: 0 3px;
   border-radius: 8px;
-  background: var(--ink);
+  background: var(--inverse-bg);
   color: #fff;
   font-size: 11px;
   line-height: 16px;
@@ -286,8 +391,8 @@ body {
   height: var(--cell);
   padding: 0;
   border: 0;
-  border-right: 1px solid rgb(122 90 51 / 0.75);
-  border-bottom: 1px solid rgb(122 90 51 / 0.75);
+  border-right: 1px solid var(--sq-line);
+  border-bottom: 1px solid var(--sq-line);
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -370,9 +475,9 @@ body {
   width: 86%;
   height: 92%;
   clip-path: polygon(50% 0, 86% 16%, 96% 100%, 4% 100%, 14% 16%);
-  background: linear-gradient(180deg, var(--piece-face), #f0dfb6);
+  background: linear-gradient(180deg, var(--piece-face), var(--piece-face-lo));
   box-shadow: inset 0 -2px 0 var(--piece-edge);
-  color: #1b1b1b;
+  color: var(--piece-ink);
   pointer-events: none;
   z-index: 1;
 }
@@ -387,7 +492,7 @@ body {
   padding-top: 8%;
 }
 .piece-promoted .piece-glyph {
-  color: var(--shu);
+  color: var(--piece-promoted);
 }
 .piece-guide {
   position: absolute;
@@ -454,9 +559,9 @@ body {
   justify-items: center;
   gap: 2px;
   padding: 4px 0;
-  border: 1px solid #d9ccb1;
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: #fff;
+  background: var(--field);
   cursor: pointer;
 }
 .promote-choice .piece {
@@ -531,7 +636,7 @@ body {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--ink);
+  background: var(--inverse-bg);
   color: #ffe7a8;
   font-size: 13px;
 }
@@ -546,7 +651,7 @@ body {
 
 /* ------------------------------------------------------------------ kifu */
 .kifu {
-  border: 1px solid #ddd0b6;
+  border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--card);
 }
@@ -608,7 +713,7 @@ body {
 }
 .kifu-list button[aria-current='true'],
 .kifu-entry[aria-current='true'] {
-  background: rgb(255 200 40 / 0.45);
+  background: var(--kifu-current);
   font-weight: 700;
 }
 .kifu-ply {
@@ -634,9 +739,9 @@ body {
 .chip {
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid #cfc3ab;
+  border: 1px solid var(--line-strong);
   border-radius: 999px;
-  background: #fff;
+  background: var(--field);
   color: var(--ink);
   font-size: 13px;
   cursor: pointer;
@@ -664,8 +769,8 @@ body {
 }
 .btn:disabled {
   /* A muted fill instead of a washed-out accent (a pale red reads as an error). */
-  background: #e6ddcc;
-  color: #857a6c;
+  background: var(--disabled-bg);
+  color: var(--disabled-fg);
   cursor: not-allowed;
 }
 .btn-step {
@@ -673,7 +778,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #4a4037;
+  background: var(--btn-dark);
   color: #fff;
 }
 .btn-primary {
@@ -681,7 +786,7 @@ body {
   color: #fff;
 }
 .btn-quiet {
-  background: #e4dccb;
+  background: var(--quiet);
   color: var(--ink);
 }
 .btn-danger {
@@ -704,7 +809,7 @@ body {
   pointer-events: none;
 }
 .notice-attack {
-  background: var(--ink);
+  background: var(--inverse-bg);
   color: #ffd76a;
 }
 .notice-warn {
@@ -728,7 +833,7 @@ body {
   gap: 8px;
   padding: 4px 4px 4px 16px;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--inverse-bg);
   color: #fff;
   font-size: 14px;
   box-shadow: 0 8px 20px rgb(var(--shadow-rgb) / 0.25);
@@ -740,7 +845,7 @@ body {
   border: 0;
   border-radius: 999px;
   background: #ffd76a;
-  color: var(--ink);
+  color: var(--piece-ink);
   font-weight: 700;
   cursor: pointer;
 }
@@ -762,7 +867,7 @@ body {
   box-shadow: 0 24px 60px rgb(var(--shadow-rgb) / 0.35);
 }
 .modal::backdrop {
-  background: rgb(24 18 10 / 0.5);
+  background: var(--backdrop);
   backdrop-filter: blur(4px);
 }
 .modal[open] {
@@ -801,9 +906,9 @@ body {
   width: 100%;
   min-height: 46px;
   padding: 0 14px;
-  border: 1px solid #e0d6c2;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--field);
   color: var(--ink);
   cursor: pointer;
 }
@@ -812,7 +917,7 @@ body {
   box-shadow: inset 0 0 0 1px var(--shu);
 }
 .level-option:disabled {
-  background: #f1ece2;
+  background: var(--sunken);
   color: var(--ink-soft);
   cursor: default;
 }
@@ -851,14 +956,14 @@ body {
   align-items: center;
   min-height: 40px;
   padding: 0 12px;
-  border: 1px solid #d6cab2;
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   font-size: 13px;
   cursor: pointer;
 }
 .segment input:checked + span {
   border-color: var(--shu);
-  background: #fbe9e5;
+  background: var(--shu-tint);
   font-weight: 700;
 }
 .segment input:focus-visible + span {
@@ -881,7 +986,7 @@ body {
   margin: 8px 0 0;
   padding: 8px 10px;
   border-radius: 8px;
-  background: #fff1d6;
+  background: var(--notice-bg);
   font-size: 13px;
 }
 .setting-note {
@@ -891,7 +996,7 @@ body {
 }
 
 .modal-result {
-  border-top: 8px solid var(--ink-soft);
+  border-top: 8px solid var(--neutral-mark);
 }
 .result-win {
   border-top-color: #3e7a52;
@@ -925,7 +1030,7 @@ body {
   margin: 10px 0 0;
   padding: 8px 12px;
   border-radius: 10px;
-  background: #fff1d6;
+  background: var(--notice-bg);
   font-weight: 700;
 }
 .result-board {
@@ -942,8 +1047,8 @@ body {
 .result-cell {
   display: grid;
   place-items: center;
-  border-right: 1px solid rgb(122 90 51 / 0.5);
-  border-bottom: 1px solid rgb(122 90 51 / 0.5);
+  border-right: 1px solid var(--thumb-line);
+  border-bottom: 1px solid var(--thumb-line);
 }
 .result-next {
   width: 100%;
@@ -1109,7 +1214,7 @@ body {
   margin: 0 auto 10px;
   padding: 4px;
   border-radius: 999px;
-  background: #e6dcc8;
+  background: var(--track);
 }
 .mode-tab {
   min-height: 40px;
@@ -1138,7 +1243,7 @@ body {
   display: grid;
   gap: 10px;
   padding: 16px;
-  border: 1px solid #ddd0b6;
+  border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--card);
 }
@@ -1179,13 +1284,13 @@ body {
   gap: 6px 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f5eee0;
+  background: var(--sunken);
 }
 .rank-progress {
   grid-column: 1 / -1;
   height: 6px;
   border-radius: 3px;
-  background: #e2d6bf;
+  background: var(--progress-bg);
   overflow: hidden;
 }
 .rank-progress i {
@@ -1237,9 +1342,9 @@ body {
 .setting-select select {
   min-height: 40px;
   padding: 0 8px;
-  border: 1px solid #d6cab2;
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: #fff;
+  background: var(--field);
   font-size: 14px;
 }
 .seek-card {
@@ -1248,7 +1353,7 @@ body {
   gap: 8px;
   padding: 16px;
   border-radius: 12px;
-  background: #f5eee0;
+  background: var(--sunken);
   text-align: center;
 }
 .seek-card strong {
@@ -1260,15 +1365,15 @@ body {
   background: var(--ink);
 }
 .seek-found {
-  background: #e3f1e6;
+  background: var(--good-bg);
 }
 .invite-url {
   width: 100%;
   min-height: 44px;
   padding: 0 10px;
-  border: 1px solid #d6cab2;
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: #fff;
+  background: var(--field);
   font-size: 13px;
 }
 .invite-qr {
@@ -1295,7 +1400,7 @@ body {
 .name-custom input {
   min-height: 44px;
   padding: 0 10px;
-  border: 1px solid #d6cab2;
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   font-size: 16px;
 }
@@ -1303,8 +1408,8 @@ body {
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fbe3df;
-  color: #7a241c;
+  background: var(--bad-bg);
+  color: var(--bad-fg);
   font-size: 14px;
 }
 .online-connection,
@@ -1319,7 +1424,7 @@ body {
   margin: 0 auto 8px;
   padding: 8px 12px;
   border-radius: 10px;
-  background: var(--ink);
+  background: var(--inverse-bg);
   color: #ffe7a8;
   font-size: 13px;
   text-align: center;
@@ -1334,7 +1439,7 @@ body {
   padding: 0 10px;
   border-radius: 10px;
   background: var(--card);
-  border: 1px solid #e3d8c3;
+  border: 1px solid var(--line);
 }
 .player-turn {
   border-color: var(--shu);
@@ -1346,7 +1451,7 @@ body {
   font-size: 14px;
 }
 .player-warn {
-  color: var(--shu);
+  color: var(--shu-text);
   font-size: 12px;
   font-weight: 700;
 }
@@ -1358,13 +1463,13 @@ body {
   min-width: 4.2em;
   padding: 4px 8px;
   border-radius: 8px;
-  background: #efe6d5;
+  background: var(--sunken);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   text-align: center;
 }
 .clock-running {
-  background: var(--ink);
+  background: var(--inverse-bg);
   color: #fff;
 }
 .clock-warn.clock-running {
@@ -1401,11 +1506,11 @@ body {
   font-size: 24px;
 }
 .delta-up {
-  color: #2f7a45;
+  color: var(--good-fg);
   font-weight: 700;
 }
 .delta-down {
-  color: var(--shu);
+  color: var(--shu-text);
   font-weight: 700;
 }
 .result-next + .result-next {

@@ -11,7 +11,7 @@ export const Route = createFileRoute('/license')({
       {
         path: '/license',
         title: `ライセンス・ソースコード｜${SITE_NAME}`,
-        description: `${SITE_NAME}のソースコードとライセンスです。GPL-3.0で公開しているソースコードの場所、元にした参考站、将棋エンジンのやねうら王、使っているライブラリをまとめています。`,
+        description: `${SITE_NAME}のソースコードとライセンスです。GPL-3.0で公開しているソースコードの場所、将棋エンジンのやねうら王、使っているフォントやライブラリをまとめています。`,
       },
       [breadcrumb([{ name: SITE_NAME, path: '/' }, { name: 'ライセンス・ソースコード', path: '/license' }])],
     ),
@@ -35,18 +35,9 @@ function License() {
         </li>
       </ul>
 
-      <h2>元にしたプログラム：参考站</h2>
       <p>
-        本サイトは、参考站 が GPL-3.0 で公開している「参考站」（
-        <a href="参考站">参考站>
-        ）のプログラムを元にしています。将棋のルール判定、棋譜の読み書き、AI（入門〜超級）、手筋・囲いの判定、対局サーバー、戦績の保存などを移植して使っています。画面、デザイン、文章は本サイトで新しく作ったもので、参考站 のものは使っていません。
+        一部のプログラムは、GPL-3.0 で公開されているほかのプロジェクトのコードを元にしています。そうしたファイルには、元の著作権表示と本サイトでの変更内容を記しています（リポジトリの <code>NOTICE.md</code> も参照）。
       </p>
-      <ul>
-        <li>
-          ソースコード：<a href="参考站的源码">参考站的源码>
-        </li>
-        <li>移植したファイルには、元の著作権表示と、本サイトでの変更内容を記しています。</li>
-      </ul>
 
       <h2>将棋エンジン：やねうら王と水匠</h2>
       <p>
@@ -58,7 +49,7 @@ function License() {
         </li>
         <li>
           WebAssembly 版の作成：<a href="https://github.com/mizar/YaneuraOu">mizar 氏</a>、
-          <a href="https://github.com/usumerican/yaneuraou-suisho-petite">usumerican 氏</a>、参考站（参考站）
+          <a href="https://github.com/usumerican/yaneuraou-suisho-petite">usumerican 氏</a>
         </li>
         <li>
           配信している wasm ファイルに対応するソースコードとビルド手順：リポジトリの <code>third_party/yaneuraou/</code>
